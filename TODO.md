@@ -95,8 +95,13 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
 
 ## Polish
 
-- [ ] **Options screen.** Volume (once audio exists), window scale, key
-      rebinding — none of these exist today.
+- [x] **Options screen.** *Implemented 2026-09-10.* Reached from the menu:
+      effects and music sliders that take effect (and play a sample) as they
+      move, window size at 75/100/125/150% of the design resolution plus
+      fullscreen, and every match key rebindable — click a binding, press a
+      key. Taking a key another action holds swaps the two rather than
+      double-binding, and the game looks keys up by action
+      (`Progress.action_for()`), so the HUD prompts follow whatever is bound.
 - [ ] **Generate the art.** `assets/PROMPTS.md` is written and the loader in
       `scripts/art.gd` picks files up with no reimport; dropping in real
       sprites is a one-evening visual overhaul.

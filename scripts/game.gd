@@ -338,37 +338,38 @@ func _unhandled_input(event: InputEvent) -> void:
 			_refresh_info()
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
-		match event.keycode:
-			KEY_ESCAPE:
+		# Keys are looked up as actions, so rebinding needs no change here.
+		match Progress.action_for(event.keycode):
+			"cancel":
 				placing = ""
 				_select(null)
 				_refresh_info()
-			KEY_SPACE:
+			"start_wave":
 				if not game_over and not in_wave:
 					_start_wave_early()
-			KEY_P:
+			"pause":
 				_toggle_pause()
-			KEY_F:
+			"speed":
 				_cycle_speed()
-			KEY_A:
+			"auto":
 				_toggle_auto()
-			KEY_U:
+			"upgrade":
 				if selected != null:
 					_upgrade_selected()
-			KEY_X:
+			"sell":
 				if selected != null:
 					_sell_selected()
-			KEY_T:
+			"target":
 				_cycle_target_mode()
-			KEY_R:
+			"restart":
 				if game_over:
 					_restart()
-			KEY_M:
+			"menu":
 				_to_menu()
-			KEY_F1:
+			"cheats":
 				if cheats != null:
 					cheats.toggle()
-			KEY_F2:
+			"tuning":
 				if tuning_panel != null:
 					tuning_panel.toggle()
 
@@ -1776,11 +1777,13 @@ func _build_game_over(root: Control) -> void:
 	lbl_over.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(lbl_over)
 
-	var again := _button("Play again  (R)", 16, Vector2(0.0, 42.0))
+	var again := _button("Play again  (%s)" % Progress.key_name("restart"), 16,
+			Vector2(0.0, 42.0))
 	again.pressed.connect(_restart)
 	col.add_child(again)
 
-	var menu := _button("Level select  (M)", 15, Vector2(0.0, 38.0))
+	var menu := _button("Level select  (%s)" % Progress.key_name("menu"), 15,
+			Vector2(0.0, 38.0))
 	menu.pressed.connect(_to_menu)
 	col.add_child(menu)
 
@@ -1870,8 +1873,8 @@ func _update_hud() -> void:
 			lbl_status.text = "Auto-start armed — wave %d rolls in with a +$%d bonus%s" \
 					% [wave + 1, bonus, from]
 		else:
-			lbl_status.text = "Next wave in %.1fs — Start now for +$%d bonus (Space)%s" \
-					% [maxf(0.0, break_timer), bonus, from]
+			lbl_status.text = "Next wave in %.1fs — Start now for +$%d bonus (%s)%s" \
+					% [maxf(0.0, break_timer), bonus, Progress.key_name("start_wave"), from]
 		btn_start.disabled = false
 		btn_start.text = "Start Wave"
 	_refresh_wave_preview()
@@ -1930,8 +1933,12 @@ func _refresh_info(preview: String = "") -> void:
 		return
 
 	info_title.text = str(level_def["name"])
-	info_body.text = "%s\n%s\nDrag a tower onto the map, or click a card then a cell. Click a placed tower to install ranks (U buys the cheapest, X sells). Space starts a wave early for gold. A auto, T target, P pause, F speed, M menu." \
-			% [level_def["blurb"], "\n".join(objective_lines())]
+	info_body.text = "%s\n%s\nDrag a tower onto the map, or click a card then a cell. Click a placed tower to install ranks (%s upgrades, %s sells). %s starts a wave early for gold. %s auto, %s target, %s pause, %s speed, %s menu." \
+			% [level_def["blurb"], "\n".join(objective_lines()),
+			Progress.key_name("upgrade"), Progress.key_name("sell"),
+			Progress.key_name("start_wave"), Progress.key_name("auto"),
+			Progress.key_name("target"), Progress.key_name("pause"),
+			Progress.key_name("speed"), Progress.key_name("menu")]
 
 
 func _show_selected_info() -> void:

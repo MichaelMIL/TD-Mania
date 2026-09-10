@@ -12,6 +12,8 @@ var armed_erase: int = -1
 func _ready() -> void:
 	Progress.migrate_legacy()
 	Audio.set_volumes(Progress.volume("sfx"), Progress.volume("music"))
+	# The window size the player chose in Options, applied once at startup.
+	Progress.apply_window_scale()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_build()
 

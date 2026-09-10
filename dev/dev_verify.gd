@@ -214,6 +214,7 @@ func _ready() -> void:
 	_check_board_tooltips()
 	_check_objectives()
 	_check_respec()
+	_check_options()
 	_check_enemy_kinds()
 	_check_cheats()
 	_check_audio()
@@ -1510,6 +1511,86 @@ func _check_targeting() -> void:
 
 
 
+
+
+
+
+## Options: volumes, window scale and key bindings, including the swap that
+## stops two actions sharing a key.
+func _check_options() -> void:
+	Progress.use_clean_state()
+	Progress.read_only = true
+
+	# Bindings start at the defaults and resolve both ways.
+	check("a default binding resolves to its key",
+			Progress.key_for("start_wave") == KEY_SPACE)
+	check("and a key resolves back to its action",
+			Progress.action_for(KEY_SPACE) == "start_wave")
+	check("a key bound to nothing does nothing",
+			Progress.action_for(KEY_QUOTELEFT) == "")
+	check("every action has a readable name",
+			Progress.key_name("sell") != "" and Progress.key_name("sell") != "—")
+
+	# Rebinding to a free key.
+	check("rebinding to a free key works",
+			Progress.bind_key("sell", KEY_QUOTELEFT))
+	check("the new key triggers the action",
+			Progress.action_for(KEY_QUOTELEFT) == "sell")
+	check("and the old one no longer does", Progress.action_for(KEY_X) == "")
+
+	# Rebinding onto a taken key swaps rather than double-binding.
+	Progress.reset_keys()
+	check("reset puts the defaults back", Progress.key_for("sell") == KEY_X
+			and Progress.keys.is_empty())
+	Progress.bind_key("sell", KEY_U)
+	check("taking another action's key swaps them",
+			Progress.action_for(KEY_U) == "sell" and Progress.key_for("upgrade") == KEY_X)
+	var bound: Array = []
+	var clash := ""
+	for entry: Dictionary in Progress.DEFAULT_KEYS:
+		var code := Progress.key_for(str(entry["id"]))
+		if bound.has(code):
+			clash = str(entry["id"])
+		bound.append(code)
+	check("so no two actions ever share a key (%s)" % clash, clash == "")
+	check("rebinding to the key it already has is a no-op",
+			not Progress.bind_key("sell", KEY_U))
+	Progress.reset_keys()
+
+	# Volumes and window scale round-trip through the save.
+	Progress.set_volume("sfx", 0.42)
+	Progress.set_window_scale(1.25)
+	var cfg := ConfigFile.new()
+	cfg.set_value("meta", "version", Progress.SAVE_VERSION)
+	cfg.set_value("options", "sfx", 0.42)
+	cfg.set_value("options", "window_scale", 1.25)
+	cfg.set_value("keys", "sell", KEY_QUOTELEFT)
+	Progress.apply_config(cfg)
+	check("volume is read back from a save",
+			is_equal_approx(Progress.volume("sfx"), 0.42))
+	check("so is the window scale",
+			is_equal_approx(Progress.window_scale(), 1.25))
+	check("and so are rebound keys", Progress.key_for("sell") == KEY_QUOTELEFT)
+	check("the scale is one of the offered sizes",
+			Progress.WINDOW_SCALES.has(Progress.window_scale()))
+
+	# The options screen must build and drive Progress, not its own copy.
+	var screen: Control = load("res://options.tscn").instantiate()
+	add_child(screen)
+	check("the options screen builds", screen.key_rows.size()
+			== Progress.DEFAULT_KEYS.size())
+	screen._listen_for("pause")
+	var press := InputEventKey.new()
+	press.keycode = KEY_G
+	press.pressed = true
+	screen._input(press)
+	check("pressing a key in the screen rebinds it",
+			Progress.key_for("pause") == KEY_G)
+	screen._on_reset_keys()
+	check("and its reset button clears the lot", Progress.keys.is_empty())
+	remove_child(screen)
+	screen.queue_free()
+	Progress.use_clean_state()
 
 
 ## A respec has to hand back most of what was spent and clear everything it

@@ -43,6 +43,18 @@ version. The names are the keys in `Audio.bank`: `shot_gun`, `shot_cannon`,
 `shot_light`, `explosion`, `death`, `leak`, `build`, `upgrade`, `sell`,
 `wave_start`, `wave_clear`, `game_over`, `boss`, `click`, `beam`, `music`.
 
+### Options
+
+**Options** on the menu covers sound, window and keys. The effects and music
+sliders apply as they move (effects plays a sample so the level is audible),
+the window can be set to 75/100/125/150% of the 1520 x 902 design resolution
+or fullscreen, and every match key is rebindable — click a binding and press
+the key. Binding a key another action already holds swaps the two, so nothing
+is ever bound twice.
+
+The match resolves keys through `Progress.action_for(keycode)` rather than
+matching keycodes, and the HUD prompts print whatever is currently bound.
+
 ### Respec
 
 Coins used to be spent for good. The tech screen now has a **Respec** button
@@ -607,6 +619,9 @@ godot --headless dev/dev_air.tscn       # air-support cycle: launch, attack, lan
                                         # relaunch, against a stationary target
 SHOT_PATH=/tmp/shot.png godot --quit-after 600 dev/dev_shot.tscn -- --panel tuning
                                         # windowed: saves one frame so a UI
-                                        # change can be looked at; --fill and
-                                        # --wave set the board up first
+                                        # change can be looked at; --fill,
+                                        # --wave N, --spawn KIND, --hover and
+                                        # --delay S set the board up first
+SCREEN_SCENE=res://options.tscn SHOT_PATH=/tmp/o.png \
+    godot --quit-after 600 dev/dev_screen_shot.tscn   # same, for whole screens
 ```

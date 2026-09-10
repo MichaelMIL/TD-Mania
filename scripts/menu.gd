@@ -170,6 +170,13 @@ func _account_bar() -> Control:
 	slots.pressed.connect(func(): get_tree().change_scene_to_file("res://main.tscn"))
 	row.add_child(slots)
 
+	var options := Button.new()
+	options.text = "Options"
+	options.custom_minimum_size = Vector2(96.0, 36.0)
+	options.focus_mode = Control.FOCUS_NONE
+	options.pressed.connect(func(): get_tree().change_scene_to_file("res://options.tscn"))
+	row.add_child(options)
+
 	var stats := Button.new()
 	stats.text = "Stats"
 	stats.custom_minimum_size = Vector2(88.0, 36.0)

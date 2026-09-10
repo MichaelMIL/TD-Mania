@@ -228,6 +228,7 @@ static func apply_config(cfg: ConfigFile) -> void:
 	runs = {}
 	stats = {}
 	stars = {}
+	keys = {}
 	tower_ranks = {}
 	xp = int(cfg.get_value("progress", "xp", 0))
 	coins = int(cfg.get_value("progress", "coins", 0))
@@ -251,6 +252,11 @@ static func apply_config(cfg: ConfigFile) -> void:
 	if cfg.has_section("stars"):
 		for key: String in cfg.get_section_keys("stars"):
 			stars[key] = int(cfg.get_value("stars", key, 0))
+	keys = {}
+	if cfg.has_section("keys"):
+		for key: String in cfg.get_section_keys("keys"):
+			keys[key] = int(cfg.get_value("keys", key, 0))
+	options["window_scale"] = float(cfg.get_value("options", "window_scale", 1.0))
 
 
 static func save_state() -> void:
@@ -272,9 +278,116 @@ static func save_state() -> void:
 	cfg.set_value("options", "music", volume("music"))
 	for key: String in stars:
 		cfg.set_value("stars", key, int(stars[key]))
+	for key: String in keys:
+		cfg.set_value("keys", key, int(keys[key]))
+	cfg.set_value("options", "window_scale", window_scale())
 	for key: String in runs:
 		cfg.set_value("runs", key, runs[key])
 	cfg.save(slot_path(slot))
+
+
+# ------------------------------------------------------------- key binds
+
+## Every rebindable action, in the order the options screen lists them, with
+## the key it ships with. The match looks up an action by keycode rather
+## than matching keys directly, so a rebind needs no change in game.gd.
+const DEFAULT_KEYS: Array = [
+	{"id": "start_wave", "name": "Start wave early", "key": KEY_SPACE},
+	{"id": "auto", "name": "Toggle auto-start", "key": KEY_A},
+	{"id": "pause", "name": "Pause", "key": KEY_P},
+	{"id": "speed", "name": "Game speed", "key": KEY_F},
+	{"id": "upgrade", "name": "Upgrade selected tower", "key": KEY_U},
+	{"id": "sell", "name": "Sell selected tower", "key": KEY_X},
+	{"id": "target", "name": "Cycle targeting", "key": KEY_T},
+	{"id": "restart", "name": "Restart after defeat", "key": KEY_R},
+	{"id": "menu", "name": "Back to level select", "key": KEY_M},
+	{"id": "cancel", "name": "Cancel / deselect", "key": KEY_ESCAPE},
+	{"id": "cheats", "name": "Developer cheats", "key": KEY_F1},
+	{"id": "tuning", "name": "Balance tuning", "key": KEY_F2},
+]
+
+## Overrides only; anything absent uses the default above.
+static var keys: Dictionary = {}
+
+
+static func key_for(action: String) -> int:
+	load_state()
+	if keys.has(action):
+		return int(keys[action])
+	for entry: Dictionary in DEFAULT_KEYS:
+		if str(entry["id"]) == action:
+			return int(entry["key"])
+	return KEY_NONE
+
+
+## Which action a keycode triggers, or "" for a key that does nothing.
+static func action_for(keycode: int) -> String:
+	load_state()
+	for entry: Dictionary in DEFAULT_KEYS:
+		var action := str(entry["id"])
+		if key_for(action) == keycode:
+			return action
+	return ""
+
+
+## Rebinds an action. A key already in use is swapped with this one rather
+## than left bound to two things.
+static func bind_key(action: String, keycode: int) -> bool:
+	load_state()
+	if keycode == KEY_NONE or key_for(action) == keycode:
+		return false
+	var taken := action_for(keycode)
+	var previous := key_for(action)
+	keys[action] = keycode
+	if taken != "" and taken != action:
+		keys[taken] = previous
+	save_state()
+	return true
+
+
+static func reset_keys() -> void:
+	load_state()
+	keys = {}
+	save_state()
+
+
+static func key_name(action: String) -> String:
+	var code := key_for(action)
+	return "—" if code == KEY_NONE else OS.get_keycode_string(code)
+
+
+# ------------------------------------------------------------ window scale
+
+## Multiples of the design resolution the window can be set to.
+const WINDOW_SCALES: Array = [0.75, 1.0, 1.25, 1.5]
+
+
+static func window_scale() -> float:
+	load_state()
+	return float(options.get("window_scale", 1.0))
+
+
+static func set_window_scale(value: float) -> void:
+	load_state()
+	options["window_scale"] = value
+	save_state()
+	apply_window_scale()
+
+
+## Resizes the window to the chosen multiple of the design resolution and
+## re-centres it. Fullscreen is left to the window manager.
+static func apply_window_scale() -> void:
+	if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN:
+		return
+	var base := Vector2i(int(ProjectSettings.get_setting("display/window/size/viewport_width")),
+			int(ProjectSettings.get_setting("display/window/size/viewport_height")))
+	var wanted := Vector2i(Vector2(base) * window_scale())
+	if DisplayServer.window_get_size() == wanted:
+		return
+	DisplayServer.window_set_size(wanted)
+	var screen := DisplayServer.screen_get_usable_rect(DisplayServer.window_get_current_screen())
+	DisplayServer.window_set_position(screen.position
+			+ (screen.size - wanted) / 2)
 
 
 # --------------------------------------------------------------- audio
@@ -578,6 +691,7 @@ static func use_clean_state() -> void:
 	tower_ranks = {}
 	stats = {}
 	stars = {}
+	keys = {}
 	runs = {}
 	# Balance overrides are excluded too, so a simulation measures the numbers
 	# in data.gd rather than whatever the developer was last experimenting with.
