@@ -463,6 +463,55 @@ static func record_stars(level_id: String, mask: int) -> int:
 	return gained
 
 
+## ------------------------------------------------------------------ respec
+##
+## Coins are otherwise spent for good, which makes experimenting expensive
+## and leaves an account stuck with whatever it bought at level 5. A respec
+## refunds most of what was spent and clears every rank, doctrine and tower
+## alike, so a build can be tried and undone.
+const RESPEC_REFUND := 0.8
+
+
+## Everything the account has spent on ranks, at the prices it paid.
+static func spent_on_tech() -> int:
+	load_state()
+	var total := 0
+	for t: Dictionary in TECH:
+		var owned := int(ranks.get(str(t["id"]), 0))
+		for r in owned:
+			total += int(float(t["cost"]) * pow(float(t["cost_mult"]), float(r)))
+	for type_id: String in tower_ranks:
+		if not TDData.TOWERS.has(type_id):
+			continue
+		var list: Array = tower_ranks[type_id]
+		for track in list.size():
+			for r in int(list[track]):
+				total += TDData.track_cost(type_id, track, r)
+	return total
+
+
+## What a respec hands back: most of it, never more than was spent.
+static func respec_refund() -> int:
+	return int(floor(float(spent_on_tech()) * RESPEC_REFUND))
+
+
+static func has_anything_to_respec() -> bool:
+	return spent_on_tech() > 0
+
+
+## Clears every rank and pays the refund. Returns what was handed back.
+static func respec() -> int:
+	load_state()
+	var refund := respec_refund()
+	if refund <= 0 and not has_anything_to_respec():
+		return 0
+	ranks = {}
+	tower_ranks = {}
+	coins += refund
+	save_state()
+	return refund
+
+
 static func best_wave(level_id: String) -> int:
 	load_state()
 	return int(bests.get(level_id, 0))

@@ -213,6 +213,7 @@ func _ready() -> void:
 	_check_flyers()
 	_check_board_tooltips()
 	_check_objectives()
+	_check_respec()
 	_check_enemy_kinds()
 	_check_cheats()
 	_check_audio()
@@ -1507,6 +1508,55 @@ func _check_targeting() -> void:
 
 
 
+
+
+
+
+## A respec has to hand back most of what was spent and clear everything it
+## refunded — anything else is either a coin fountain or a robbery.
+func _check_respec() -> void:
+	Progress.use_clean_state()
+	Progress.read_only = true
+	Progress.coins = 5000
+	Progress.ranks = {}
+	Progress.tower_ranks = {}
+	check("nothing bought means nothing to refund",
+			not Progress.has_anything_to_respec() and Progress.respec_refund() == 0)
+	check("and respeccing then does nothing", Progress.respec() == 0)
+
+	# Buy a spread: two doctrine ranks and a couple of tower ranks.
+	var spent := 0
+	var first: Dictionary = Progress.TECH[0]
+	for r in 2:
+		spent += Progress.node_cost(str(first["id"]))
+		check("a doctrine rank is bought", Progress.buy(str(first["id"])))
+	spent += TDData.track_cost("gun", 0, 0)
+	check("a tower rank is bought", Progress.buy_track("gun", 0))
+	spent += TDData.track_cost("gun", 0, 1)
+	check("and a second rank on the same track", Progress.buy_track("gun", 0))
+
+	check("the account knows what it spent (%d vs %d)"
+			% [Progress.spent_on_tech(), spent], Progress.spent_on_tech() == spent)
+	var expected := int(floor(float(spent) * Progress.RESPEC_REFUND))
+	check("the refund is most of it, not all of it",
+			Progress.respec_refund() == expected and expected < spent and expected > 0)
+
+	var before := Progress.coins
+	var refunded := Progress.respec()
+	check("respeccing pays exactly what it quoted", refunded == expected
+			and Progress.coins == before + expected)
+	check("every doctrine rank is gone", Progress.rank(str(first["id"])) == 0)
+	check("every tower rank is gone too", Progress.track_rank_for("gun", 0) == 0)
+	check("and there is nothing left to refund",
+			not Progress.has_anything_to_respec())
+	check("so a run of respecs cannot mint coins", Progress.respec() == 0
+			and Progress.coins == before + expected)
+
+	# Buying it all back must cost what it did the first time.
+	for r in 2:
+		Progress.buy(str(first["id"]))
+	check("prices reset with the ranks", Progress.spent_on_tech() > 0)
+	Progress.use_clean_state()
 
 
 ## Every map has three objectives, they are judged on what the run actually

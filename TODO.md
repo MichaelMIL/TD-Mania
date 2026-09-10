@@ -68,8 +68,12 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
       `Progress.stars` (union across attempts, nothing for a cheated run),
       and they show on the level cards, in the account bar, on the in-match
       info panel and on the defeat card.
-- [ ] **Tech respec.** Coins are spent permanently with no way to experiment.
-      A paid respec button on the tech screen would encourage trying builds.
+- [x] **Tech respec.** *Implemented 2026-09-10.* A **Respec** button on the
+      tech screen quotes what it will pay — 80% of everything spent, at the
+      prices actually paid, doctrine and tower ranks together — and a second
+      press clears every rank and banks the refund
+      (`Progress.spent_on_tech()` / `respec()`). Tested to never mint coins
+      by repeating it and to leave nothing behind that it refunded.
 
 ## Robustness
 

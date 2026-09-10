@@ -16,6 +16,8 @@ var pane: VBoxContainer
 var selected: String = "global"
 var reset_armed: bool = false
 var btn_reset: Button
+var btn_respec: Button
+var respec_armed: bool = false
 
 
 func _ready() -> void:
@@ -113,6 +115,15 @@ func _build() -> void:
 	var foot := HBoxContainer.new()
 	foot.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_child(foot)
+	# Respec first: it is the one people actually want, and it sits well
+	# clear of the button that erases the account.
+	btn_respec = Button.new()
+	btn_respec.custom_minimum_size = Vector2(300.0, 30.0)
+	btn_respec.add_theme_font_size_override("font_size", 12)
+	btn_respec.focus_mode = Control.FOCUS_NONE
+	btn_respec.pressed.connect(_on_respec)
+	foot.add_child(btn_respec)
+
 	btn_reset = Button.new()
 	btn_reset.text = "Reset all progress"
 	btn_reset.custom_minimum_size = Vector2(190.0, 30.0)
@@ -273,6 +284,23 @@ func _on_buy_track(type_id: String, track: int) -> void:
 		_refresh()
 
 
+## Hands back most of what was spent and clears every rank, so a build can
+## be undone. Two presses, like the reset button beside it.
+func _on_respec() -> void:
+	if not Progress.has_anything_to_respec():
+		return
+	if not respec_armed:
+		respec_armed = true
+		btn_respec.text = "Press again — clears every rank for %d coins back" \
+				% Progress.respec_refund()
+		return
+	var refund := Progress.respec()
+	respec_armed = false
+	_show(selected)
+	_refresh()
+	btn_respec.text = "Refunded %d coins" % refund
+
+
 func _on_reset() -> void:
 	if not reset_armed:
 		reset_armed = true
@@ -289,6 +317,12 @@ func _refresh() -> void:
 	lbl_level.text = "Level %d   ·   %d / %d XP" % [int(info["level"]), Progress.xp,
 			int(info["to"])]
 	lbl_coins.text = "%d coins" % Progress.coins
+	if btn_respec != null and not respec_armed:
+		var spent := Progress.spent_on_tech()
+		btn_respec.disabled = spent <= 0
+		btn_respec.text = "Respec — refund %d of %d coins (%d%%)" % [
+				Progress.respec_refund(), spent, int(Progress.RESPEC_REFUND * 100.0)] \
+				if spent > 0 else "Respec — nothing bought yet"
 
 	for id: String in rail_buttons:
 		var parts: Dictionary = rail_buttons[id]

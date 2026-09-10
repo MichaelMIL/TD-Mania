@@ -43,6 +43,14 @@ version. The names are the keys in `Audio.bank`: `shot_gun`, `shot_cannon`,
 `shot_light`, `explosion`, `death`, `leak`, `build`, `upgrade`, `sell`,
 `wave_start`, `wave_clear`, `game_over`, `boss`, `click`, `beam`, `music`.
 
+### Respec
+
+Coins used to be spent for good. The tech screen now has a **Respec** button
+that quotes the refund — 80% of everything the account has spent on ranks, at
+the prices it actually paid — and on a second press clears every doctrine and
+tower rank and banks the coins. Buying the same ranks back costs what it did
+the first time, so a respec is a haircut, not a loophole.
+
 ### Save format
 
 Each slot is a `ConfigFile` at `user://td_mania_slot_N.cfg` stamped with
