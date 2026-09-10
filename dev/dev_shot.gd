@@ -49,7 +49,7 @@ func _ready() -> void:
 		Input.warp_mouse(creep.position - Vector2(0.0, creep.radius * 1.15
 				if creep.flying else 0.0))
 		await get_tree().process_frame
-		game._refresh_creep_tip()
+		game.hud.refresh_creep_tip()
 		await get_tree().process_frame
 	RenderingServer.frame_post_draw.connect(_grab, CONNECT_ONE_SHOT)
 

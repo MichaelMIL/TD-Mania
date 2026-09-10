@@ -239,9 +239,11 @@ static func objectives_for(level: Dictionary) -> Array:
 	var deep := int(TIER_GOAL_WAVE[clampi(tier, 0, TIER_GOAL_WAVE.size() - 1)])
 	var clean := int(TIER_CLEAN_WAVE[clampi(tier, 0, TIER_CLEAN_WAVE.size() - 1)])
 	var out: Array = [
-		{"kind": "waves", "n": deep, "text": "Clear wave %d" % deep},
+		{"kind": "waves", "n": deep, "text": "Clear wave %d" % deep,
+			"short": "Wave %d" % deep},
 		{"kind": "clean", "n": clean,
-			"text": "Reach wave %d without losing a life" % clean},
+			"text": "Reach wave %d without losing a life" % clean,
+			"short": "Wave %d unhurt" % clean},
 	]
 	var goal: Dictionary = level.get("goal", {})
 	if not goal.is_empty():
@@ -256,17 +258,23 @@ static func _goal_text(goal: Dictionary) -> Dictionary:
 	match str(goal.get("kind", "")):
 		"no_water":
 			out["text"] = "Clear wave %d with no water towers" % n
+			out["short"] = "Wave %d, no water" % n
 		"few_towers":
 			out["text"] = "Clear wave %d with %d towers or fewer" \
 					% [n, int(goal.get("towers", 10))]
+			out["short"] = "Wave %d, %d towers" % [n, int(goal.get("towers", 10))]
 		"kills":
 			out["text"] = "Destroy %d enemies in one run" % n
+			out["short"] = "%d kills" % n
 		"no_sell":
 			out["text"] = "Clear wave %d without selling a tower" % n
+			out["short"] = "Wave %d, no selling" % n
 		"rich":
 			out["text"] = "Hold $%d at once" % n
+			out["short"] = "$%d at once" % n
 		_:
 			out["text"] = "Clear wave %d" % n
+			out["short"] = "Wave %d" % n
 	return out
 
 

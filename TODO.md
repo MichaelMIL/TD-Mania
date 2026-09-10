@@ -96,9 +96,13 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
       and round-trips a parked run. `dev/run_checks.sh` runs every harness
       and fails on engine errors as well as assertions, since a Godot
       runtime error is a log line, not an exit code.
-- [ ] **Split `scripts/game.gd`** (1,782 lines: state, waves, placement, HUD
-      and the service locator in one file). The HUD alone is ~700 lines and
-      lifts out cleanly.
+- [x] **Split `scripts/game.gd`.** *Implemented 2026-09-10.* The HUD moved
+      to `scripts/hud.gd` (`GameHUD`, ~930 lines): top bar, palette, wave
+      readout, info bar, creep card, defeat panel and their refreshes.
+      `game.gd` is down from 2,223 lines to ~1,310 and keeps the state, the
+      board and the service locator. The HUD owns no game state — it reads
+      the match through `game` and calls back for anything that changes the
+      world, so a bare name is a widget and a `game.` name is the match.
 
 ## Polish
 

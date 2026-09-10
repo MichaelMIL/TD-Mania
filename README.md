@@ -492,9 +492,14 @@ scripts/progress.gd       save slots, XP/level, coins, tech ranks, records, payo
 scripts/slots.gd          save-slot title screen
 scripts/tech.gd           tech tree screen
 scripts/level_preview.gd  map thumbnails drawn from the level data
-scripts/game.gd           state, waves, terrain, placement, drag and drop, HUD, and
+scripts/game.gd           state, waves, terrain, placement, drag and drop, and
                           the service locator towers use (find_target,
                           find_targets, explode, aura_at, fx_*)
+scripts/hud.gd            everything on screen during a match: top bar, palette,
+                          wave readout, info bar, creep card, defeat panel
+scripts/tuning.gd         balance overrides, layered global then per level
+scripts/tuning_panel.gd   the F2 balance editor
+scripts/options.gd        options screen: sound, window size, key bindings
 scripts/data.gd           grid metrics, level list, tower/enemy tables, upgrade tracks
 scripts/tower.gd          targeting, firing, beams, upgrade tracks, auras, squadrons
 scripts/tower_icon.gd     procedural tower portraits for the build palette

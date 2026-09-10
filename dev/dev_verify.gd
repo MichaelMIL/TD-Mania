@@ -349,12 +349,12 @@ func _check_tracks() -> void:
 			if blurb == "" or blurb.contains("_mult") or blurb.contains("_add"):
 				ok_words = false
 				bad_text = "%s track %d: %s" % [type_id, i, blurb]
-			var preview: String = game._track_explanation(type_id, i, null)
+			var preview: String = game.hud._track_explanation(type_id, i, null)
 			if not preview.contains("per rank") or not preview.contains("coins"):
 				ok_words = false
 				bad_text = "%s track %d preview" % [type_id, i]
 			var probe := _fresh(type_id)
-			var live: String = game._track_explanation(type_id, i, probe)
+			var live: String = game.hud._track_explanation(type_id, i, probe)
 			if not live.contains("This rank:"):
 				ok_numbers = false
 				bad_text = "%s track %d has no measured effect" % [type_id, i]
@@ -363,7 +363,7 @@ func _check_tracks() -> void:
 				staged[i] = int(TDData.tracks(type_id)[i]["max"])
 				Progress.tower_ranks[type_id] = staged
 				probe.ranks[i] = int(TDData.tracks(type_id)[i]["max"]) - 1
-				var final_text: String = game._track_explanation(type_id, i, probe)
+				var final_text: String = game.hud._track_explanation(type_id, i, probe)
 				if not final_text.contains("This rank unlocks"):
 					ok_capstone = false
 					bad_text = "%s track %d capstone not announced" % [type_id, i]
@@ -376,7 +376,7 @@ func _check_tracks() -> void:
 
 	# The numbers in the text have to match what the tower actually becomes.
 	var gun := _fresh("gun")
-	var quoted: String = game._track_explanation("gun", 0, gun)
+	var quoted: String = game.hud._track_explanation("gun", 0, gun)
 	var before_txt := "Damage %.0f" % gun.stat("damage")
 	gun.ranks[0] = 1
 	var after_txt := "-> %.0f" % gun.stat("damage")
@@ -919,34 +919,34 @@ func _check_wave_preview() -> void:
 	game.in_wave = false
 	game.game_over = false
 	game.wave = 5
-	game._refresh_wave_preview()
-	check("the readout is on screen during the build phase", game.preview_row.visible)
-	check("it describes the next wave, not the last", game.preview_wave == 6)
+	game.hud.refresh_wave_preview()
+	check("the readout is on screen during the build phase", game.hud.preview_row.visible)
+	check("it describes the next wave, not the last", game.hud.preview_wave == 6)
 	# Heading, one chip per kind, and the advice label when a kind has a note.
 	var kinds: int = game.wave_composition(6).size()
-	var has_note: bool = game.lbl_wave_note.text != ""
+	var has_note: bool = game.hud.lbl_wave_note.text != ""
 	check("it renders a chip per kind plus a heading",
-			game.preview_row.get_child_count() == kinds + 1 + (1 if has_note else 0))
+			game.hud.preview_row.get_child_count() == kinds + 1 + (1 if has_note else 0))
 	game.wave = 6
-	game._refresh_wave_preview()
-	check("it rebuilds when the wave advances", game.preview_wave == 7)
+	game.hud.refresh_wave_preview()
+	check("it rebuilds when the wave advances", game.hud.preview_wave == 7)
 	game.in_wave = true
-	game._refresh_wave_preview()
+	game.hud.refresh_wave_preview()
 	check("during a wave it just states what is running",
-			game.preview_row.get_child_count() == 1 and game.preview_wave == 0)
+			game.hud.preview_row.get_child_count() == 1 and game.hud.preview_wave == 0)
 	check("the strip keeps its height so the bar cannot jump",
-			game.preview_row.custom_minimum_size.y >= 20.0)
+			game.hud.preview_row.custom_minimum_size.y >= 20.0)
 	game.in_wave = false
-	game._refresh_wave_preview()
+	game.hud.refresh_wave_preview()
 	check("and the chips come back for the next build phase",
-			game.preview_row.get_child_count() > 1 and game.preview_wave == 7)
+			game.hud.preview_row.get_child_count() > 1 and game.hud.preview_wave == 7)
 	# The strip frees every child on refresh, so a kept advice label would be
 	# a freed node by the next rebuild.
-	var note_before: Label = game.lbl_wave_note
+	var note_before: Label = game.hud.lbl_wave_note
 	game.wave = 8
-	game._refresh_wave_preview()
+	game.hud.refresh_wave_preview()
 	check("the advice line is rebuilt, never a freed leftover",
-			is_instance_valid(game.lbl_wave_note) and game.lbl_wave_note != note_before)
+			is_instance_valid(game.hud.lbl_wave_note) and game.hud.lbl_wave_note != note_before)
 	game.wave = 1
 
 
@@ -1751,7 +1751,7 @@ func _check_board_tooltips() -> void:
 	check("and finds nothing where there is none",
 			game.enemy_at(warden.position + Vector2(300.0, 0.0)) == null)
 
-	var card: String = game.describe_enemy(warden)
+	var card: String = game.hud.describe_enemy(warden)
 	check("the card names the creep", card.contains(warden.display_name))
 	check("and shows how much of it is left",
 			card.contains("%d" % int(round(warden.max_hp))))
@@ -1759,24 +1759,24 @@ func _check_board_tooltips() -> void:
 			card.contains("armour") == (warden.armor > 0.0))
 	var mender := Enemy.new()
 	mender.setup("mender", 1.0, 1.0, game.routes[0])
-	check("a healer says so", str(game.describe_enemy(mender)).contains("heals"))
+	check("a healer says so", str(game.hud.describe_enemy(mender)).contains("heals"))
 	var ash := Enemy.new()
 	ash.setup("ashwalker", 1.0, 1.0, game.routes[0])
 	check("and a fireproof creep says so",
-			str(game.describe_enemy(ash)).contains("ignores fire"))
+			str(game.hud.describe_enemy(ash)).contains("ignores fire"))
 	var flyer := Enemy.new()
 	flyer.setup("drake", 1.0, 1.0, game.routes[0])
-	check("a flyer says it flies", str(game.describe_enemy(flyer)).contains("flying"))
+	check("a flyer says it flies", str(game.hud.describe_enemy(flyer)).contains("flying"))
 	var thief := Enemy.new()
 	thief.setup("thief", 1.0, 1.0, game.routes[0])
 	check("and a thief says what it takes",
-			str(game.describe_enemy(thief)).contains("steals"))
+			str(game.hud.describe_enemy(thief)).contains("steals"))
 	# Every roster entry must produce a card without erroring.
 	var blank := ""
 	for kind: String in TDData.ENEMIES:
 		var probe := Enemy.new()
 		probe.setup(kind, 1.0, 1.0, game.routes[0])
-		if str(game.describe_enemy(probe)).strip_edges() == "":
+		if str(game.hud.describe_enemy(probe)).strip_edges() == "":
 			blank = kind
 		probe.free()
 	check("every creep in the roster has a card (%s)" % blank, blank == "")

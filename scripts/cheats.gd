@@ -234,4 +234,4 @@ func _run(id: String, button: Button) -> void:
 			Progress.reset()
 			_say("Slot %d wiped." % (Progress.slot + 1))
 	if live:
-		game._refresh_info()
+		game.hud.refresh_info()
