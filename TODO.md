@@ -38,6 +38,13 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
       Storm Surge +16 -> +10 a rank, damage 26 -> 23, cost 190 -> 205, and
       creeps now build shove-resistance (`push_fatigue` in `enemy.gd`) so
       stacked cannons can no longer hold a lane still forever.
+      *Extended 2026-09-10:* the editor now covers upgrade tracks (rank
+      count, cost share, unlock level and each per-rank modifier) and creeps
+      (health, speed, armour, bounty, leak damage, size, heal, theft,
+      splits, sprint timing) as well as towers, chosen with a Towers /
+      Upgrades / Enemies selector. Subjects are addressed as `gun`,
+      `track:gun#0` and `enemy:grunt`, and reach the game through
+      `TDData.tower_def()`, `TDData.tracks()` and `TDData.enemy_def()`.
 - [x] **Spatial partitioning for targeting.** *Implemented 2026-09-10.*
       Creeps are bucketed into a 128 px grid (`GRID_CELL` in `game.gd`);
       `find_target`, `find_targets`, `explode`, the mender pass and piercing
