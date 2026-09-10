@@ -335,10 +335,23 @@ static func tier_of(level: Dictionary) -> Dictionary:
 
 
 ## A level's setting, falling back to its difficulty tier.
+## Extra gold and lives a map gets for each lane past the first. Defending
+## two or three entrances means building two or three positions, and the
+## balance report showed multi-lane maps landing about half as deep as
+## single-lane maps of the same tier without this.
+const LANE_GOLD_BONUS := 0.45
+const LANE_LIVES_BONUS := 0.3
+
+
 static func level_stat(level: Dictionary, key: String) -> float:
 	if level.has(key):
 		return float(level[key])
-	return float(tier_of(level)[key])
+	var value := float(tier_of(level)[key])
+	var extra_lanes := maxi(0, routes_of(level).size() - 1)
+	if extra_lanes > 0 and (key == "gold" or key == "lives"):
+		var per_lane := LANE_GOLD_BONUS if key == "gold" else LANE_LIVES_BONUS
+		value = round(value * (1.0 + per_lane * float(extra_lanes)))
+	return value
 
 
 static func level() -> Dictionary:

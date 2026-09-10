@@ -581,6 +581,46 @@ fast as a 120 Hz display allows, and the `App` autoload drops it to 10 fps
 whenever the window is in the background — a tower defence left open should
 not keep a core busy.
 
+### The balance report
+
+`dev/dev_report.tscn` is what makes the difficulty ladder measurable instead
+of anecdotal. It plays every map several times with the proxy player from
+`dev/proxy_player.gd`, then prints a table — waves reached, clears, lives
+left, leaks, per map and per tier — and *checks* four things rather than
+leaving them to be eyeballed:
+
+- every tier is harder, on average, than the one before it;
+- no map is a wild outlier inside its own tier;
+- no map is unplayable (the proxy dies in the first few waves);
+- no map is free (cleared without losing a life).
+
+```bash
+godot --headless --fixed-fps 5 --quit-after 900000 dev/dev_report.tscn -- --runs 2
+dev/run_checks.sh --full     # the same thing, after the fast harnesses
+```
+
+`--fixed-fps 5` gives every frame exactly 0.2 s of game time, so a run takes
+a predictable number of frames and the same seed always plays out the same
+way. That is a coarse step — it is how `dev_balance.tscn` has always
+simulated, and it is not how the game feels at 1x, which is what the smoke
+test is for.
+
+The proxy is deliberately not clever: it walks a wish list, builds next to
+the road, spends spare gold deepening what it owns, and never counters
+Menders or Wardens. Its absolute numbers are a floor, not a verdict. What it
+measures honestly is maps *against each other*, which is exactly what a
+ladder is.
+
+The first run of it found a real fault. The tier ladder held — Easy 17.2,
+Normal 14.1, Hard 12.2, Brutal 8.7 waves — but Convergence (three lanes)
+came in at 4.5 waves against a Brutal mean of 8.7, and the three worst leak
+counts in the table were the three multi-lane maps. Defending two or three
+entrances costs two or three defensive positions, and they were funded like
+a one-lane map. Multi-lane maps now start with **+45% gold and +30% lives
+per extra lane** (`LANE_GOLD_BONUS`, `LANE_LIVES_BONUS`), after which the
+ladder reads 16.9 / 14.5 / 12.1 / 10.2 with no outliers and all five checks
+passing.
+
 ### The full-speed smoke test
 
 Every other harness runs at an accelerated `time_scale`, and that is exactly
@@ -737,6 +777,9 @@ godot --headless dev/dev_air.tscn       # air-support cycle: launch, attack, lan
 godot --headless --fixed-fps 60 --quit-after 20000 dev/dev_smoke.tscn
                                         # plays waves at 1x with a watchdog on
                                         # every frame (see below)
+godot --headless --fixed-fps 5 --quit-after 900000 dev/dev_report.tscn -- --runs 2
+                                        # balance report: every map, several
+                                        # runs, and whether the ladder holds
 dev/run_checks.sh                       # all of the above, failing on any
                                         # engine error as well as any FAIL
 SHOT_PATH=/tmp/shot.png godot --quit-after 600 dev/dev_shot.tscn -- --panel tuning

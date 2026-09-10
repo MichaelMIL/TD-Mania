@@ -162,6 +162,15 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
       A wave that cost nothing says so. The defeat card carries the same
       summary for the whole run, so a loss explains itself.
 
+- [x] **Make the ladder measurable.** *Implemented 2026-09-10.*
+      `dev/dev_report.tscn` plays every map several times with the proxy
+      player (now shared, in `dev/proxy_player.gd`) and prints waves
+      reached, clears, lives and leaks per map and per tier — then asserts
+      the ladder: each tier harder than the last, no outlier inside a tier,
+      nothing unplayable, nothing free. `--fixed-fps 5` makes every frame
+      0.2 s of game time, so runs are reproducible from their seed.
+      `dev/run_checks.sh --full` runs it after the fast harnesses.
+
 ## Do last
 
 - [x] **Cut what the game costs the machine.** *Implemented 2026-09-10.*
@@ -182,11 +191,12 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
 
 ## Notes
 
-- Balance is currently measured ad hoc: the proxy player in
-  `dev/dev_balance.tscn` caps at wave 30 and does not adapt its build to
-  counter Menders or Wardens, so its numbers are a floor, not a verdict.
-  Raising the cap and sampling several runs per map would make the difficulty
-  ladder measurable rather than anecdotal.
+- Balance is measured, not guessed: `dev/dev_report.tscn` plays every map
+  twice and asserts the ladder. As of 2026-09-10 it reads Easy 16.9, Normal
+  14.5, Hard 12.1, Brutal 10.2 waves for the proxy player, with no outliers.
+  The proxy still does not counter Menders or Wardens, so those numbers are
+  a floor rather than a verdict — what they measure well is maps against
+  each other.
 - The structural difficulty ladder (road length and firing positions per tier)
   *is* enforced by the verify suite and should stay that way when new maps are
   added.

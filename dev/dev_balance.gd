@@ -5,10 +5,7 @@ extends Node
 
 var game: Node
 var act_timer: float = 0.0
-var spend_mix: Array = ["gun", "gun", "cannon", "flame", "gun", "frost", "cannon",
-		"tide", "gun", "tesla", "flame", "cannon", "marksman", "command", "tide",
-		"cannon", "airfield", "torpedo", "flame", "mortar", "helipad", "cannon"]
-var mix_index: int = 0
+var player: ProxyPlayer
 var last_wave: int = 0
 var last_leaks: int = 0
 
@@ -27,6 +24,7 @@ func _ready() -> void:
 		_run_perf()
 		get_tree().quit()
 		return
+	player = ProxyPlayer.new(game)
 	Engine.time_scale = 12.0
 
 
@@ -148,70 +146,4 @@ func _process(delta: float) -> void:
 	if act_timer > 0.0:
 		return
 	act_timer = 0.4
-	_act()
-
-
-func _act() -> void:
-	# Upgrade ranks are account purchases now, so a run is only about placing
-	# towers: walk the wish list and build the first affordable choice.
-	for offset in spend_mix.size():
-		var want: String = spend_mix[(mix_index + offset) % spend_mix.size()]
-		if game.gold < game.tower_cost(want):
-			continue
-		var spot: Vector2i = _support_spot() if want == "command" else _find_spot(want)
-		if spot.x < 0 or spot.x == -99:
-			continue
-		game.placing = want
-		game._try_place(spot)
-		game.placing = ""
-		mix_index += offset + 1
-		return
-
-
-## Support towers are worth nothing on their own, so drop them where they
-## cover the most existing towers.
-func _support_spot() -> Vector2i:
-	var best := Vector2i(-99, -99)
-	var best_score := 0
-	var radius: float = float(TDData.TOWERS["command"]["range"])
-	for y in TDData.ROWS:
-		for x in TDData.COLS:
-			var c := Vector2i(x, y)
-			if not game.can_place(c, "command"):
-				continue
-			var here: Vector2 = game.cell_center(c)
-			var score := 0
-			for t in game.occupied.values():
-				if not t.is_support() and here.distance_to(t.position) <= radius:
-					score += 1
-			if score > best_score:
-				best_score = score
-				best = c
-	return best if best_score >= 3 else Vector2i(-99, -99)
-
-
-## Prefers empty cells that touch the path, like a human would.
-func _find_spot(type_id: String) -> Vector2i:
-	var best := Vector2i(-99, -99)
-	var candidates: Array = []
-	for y in TDData.ROWS:
-		for x in TDData.COLS:
-			var c := Vector2i(x, y)
-			if not game.can_place(c, type_id):
-				continue
-			var touches := false
-			for o: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-				if game.is_path(c + o):
-					touches = true
-					break
-			if touches:
-				candidates.append(c)
-	if candidates.is_empty():
-		# Water and air towers may have no path-adjacent cell free; take any.
-		for y in TDData.ROWS:
-			for x in TDData.COLS:
-				if game.can_place(Vector2i(x, y), type_id):
-					candidates.append(Vector2i(x, y))
-	if candidates.is_empty():
-		return best
-	return candidates[randi() % candidates.size()]
+	player.act()

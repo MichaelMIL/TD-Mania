@@ -31,6 +31,13 @@ run verify --quit-after 900 dev/dev_verify.tscn
 run air    --quit-after 6000 dev/dev_air.tscn
 run smoke  --fixed-fps 60 --quit-after 20000 dev/dev_smoke.tscn
 
+# The balance report plays every map several times over, which takes
+# minutes rather than seconds. Opt in with: dev/run_checks.sh --full
+if [ "${1:-}" = "--full" ]; then
+	run report --fixed-fps 5 --quit-after 900000 dev/dev_report.tscn -- --runs 2
+	grep '^\[REPORT\]' "$out/report.log"
+fi
+
 if [ "$status" = "0" ]; then
 	echo "all checks passed"
 else

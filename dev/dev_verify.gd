@@ -1813,6 +1813,32 @@ func _check_victory() -> void:
 			TDData.clear_wave(TDData.LEVELS[0])
 			> int(TDData.objectives_for(TDData.LEVELS[0])[0]["n"]))
 
+	# Multi-lane maps have to fund a second front, or they are a tier
+	# harder than the tier says they are.
+	var single: Dictionary = {}
+	var multi: Dictionary = {}
+	for level: Dictionary in TDData.LEVELS:
+		var lanes: int = TDData.routes_of(level).size()
+		var tier := int(level.get("tier", 0))
+		if lanes > 1 and not multi.has(tier):
+			multi[tier] = level
+		if lanes == 1 and not single.has(tier):
+			single[tier] = level
+	var unfunded: Array = []
+	for tier: int in multi:
+		if not single.has(tier):
+			continue
+		var many: Dictionary = multi[tier]
+		var one: Dictionary = single[tier]
+		if TDData.level_stat(many, "gold") <= TDData.level_stat(one, "gold") \
+				or TDData.level_stat(many, "lives") <= TDData.level_stat(one, "lives"):
+			unfunded.append(str(many["id"]))
+	check("multi-lane maps start with more gold and lives (%s)"
+			% ",".join(unfunded), unfunded.is_empty())
+	check("and a single-lane map is untouched by that rule",
+			is_equal_approx(TDData.level_stat(TDData.LEVELS[0], "gold"),
+					float(TDData.tier_of(TDData.LEVELS[0])["gold"])))
+
 	# Records: first clear is reported once, and depth is kept.
 	Progress.use_clean_state()
 	Progress.read_only = true
