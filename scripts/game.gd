@@ -41,6 +41,11 @@ var placing: String = ""
 ## The palette card being hovered, if any. Shows the tower's reach on the
 ## board before you commit to buying it.
 var preview_tower: String = ""
+## A tower picked up to be put down somewhere else. Free, once per wave,
+## and only during a build phase — misplacing a Command Post should not
+## cost 30% of its price to correct.
+var moving: Tower = null
+var move_used_wave: int = -1
 var dragging: bool = false
 var selected: Tower = null
 var hover_cell: Vector2i = Vector2i(-99, -99)
@@ -369,6 +374,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _click(c: Vector2i) -> void:
+	if moving != null:
+		_drop_moved(c)
+		return
 	if placing != "":
 		_try_place(c)
 		return
@@ -533,6 +541,61 @@ func _sell_selected() -> void:
 	hud.refresh_info()
 
 
+## Whether the selected tower may be picked up right now.
+func can_move_selected() -> bool:
+	return selected != null and is_instance_valid(selected) and not in_wave \
+			and not game_over and move_used_wave != wave
+
+
+## Lifts the selected tower off the board, keeping everything about it.
+func begin_move() -> void:
+	if not can_move_selected():
+		return
+	moving = selected
+	occupied.erase(moving.cell)
+	support_towers.erase(moving)
+	moving.modulate = Color(1, 1, 1, 0.45)
+	placing = ""
+	fx_text(moving.position + Vector2(0.0, -34.0), "Pick a new cell",
+			Color("4fc3f7"), 16)
+	hud.refresh_info()
+
+
+## Puts a lifted tower down. Anywhere it could have been built is fair, and
+## anywhere else puts it back where it came from.
+func _drop_moved(c: Vector2i) -> void:
+	var tower := moving
+	if not is_instance_valid(tower):
+		moving = null
+		return
+	var home: Vector2i = tower.cell
+	var target := c if can_place(c, tower.type_id) else home
+	tower.cell = target
+	tower.position = cell_center(target)
+	tower.modulate = Color.WHITE
+	occupied[target] = tower
+	if tower.is_support():
+		support_towers.append(tower)
+	moving = null
+	if target != home:
+		move_used_wave = wave
+		Audio.play("build", -8.0)
+		fx_ring(tower.position, 40.0, Color("4fc3f7"))
+	else:
+		fx_text(tower.position + Vector2(0.0, -34.0), "Cannot go there",
+				Color("ef5350"), 15)
+	_select(tower)
+	hud.refresh_info()
+
+
+## Puts a lifted tower back untouched — used when a wave starts or the run
+## ends while one is in hand.
+func cancel_move() -> void:
+	if moving == null:
+		return
+	_drop_moved(moving.cell)
+
+
 # -------------------------------------------------------------------- waves
 
 func _process(delta: float) -> void:
@@ -579,6 +642,7 @@ func _process_menders(delta: float) -> void:
 
 
 func _start_wave() -> void:
+	cancel_move()
 	wave += 1
 	wave_leaks = {}
 	wave_report = ""
@@ -1435,6 +1499,9 @@ func _escape() -> void:
 		return
 	if paused:
 		_toggle_pause()
+		return
+	if moving != null:
+		cancel_move()
 		return
 	if placing != "" or selected != null:
 		placing = ""

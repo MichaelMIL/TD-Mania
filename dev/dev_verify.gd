@@ -656,6 +656,52 @@ func _check_drag() -> void:
 		if game.can_place(key, "gun"):
 			spot = key
 			break
+	# A misplaced tower can be picked up and put down again, free, once a
+	# wave, between waves.
+	var move_cell := Vector2i(-99, -99)
+	var spare := Vector2i(-99, -99)
+	for key: Vector2i in game.terrain:
+		if game.can_place(key, "gun"):
+			if move_cell.x < 0:
+				move_cell = key
+			elif spare.x < 0:
+				spare = key
+	game.placing = "gun"
+	game.gold = 999
+	game._try_place(move_cell)
+	game.placing = ""
+	var moved: Tower = game.occupied[move_cell]
+	game._select(moved)
+	game.in_wave = false
+	game.move_used_wave = -1
+	check("a placed tower can be moved between waves", game.can_move_selected())
+	var gold_before: int = game.gold
+	game.begin_move()
+	check("picking it up takes it off the board",
+			game.moving == moved and not game.occupied.has(move_cell))
+	game._click(spare)
+	check("putting it down moves it", game.occupied.get(spare) == moved
+			and moved.cell == spare)
+	check("and costs nothing", game.gold == gold_before)
+	check("but only once a wave", not game.can_move_selected())
+	game.move_used_wave = -1
+	game.begin_move()
+	game._click(Vector2i(-5, -5))
+	check("dropping it somewhere impossible puts it back",
+			game.occupied.get(spare) == moved and game.moving == null)
+	game.in_wave = true
+	check("and a tower cannot be moved mid-wave", not game.can_move_selected())
+	game.in_wave = false
+	game.begin_move()
+	game._start_wave()
+	check("starting a wave never leaves one in hand",
+			game.moving == null and game.occupied.has(spare))
+	game.wave -= 1
+	game.in_wave = false
+	game.occupied.erase(spare)
+	moved.queue_free()
+	game._select(null)
+
 	# Hovering a palette card previews the tower without buying it.
 	game.hud._hover_card("mortar")
 	check("hovering a card arms the preview", game.preview_tower == "mortar")

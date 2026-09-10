@@ -40,6 +40,7 @@ var info_body: Label
 var info_perk: Label
 var btn_upgrade: Button
 var btn_sell: Button
+var btn_move: Button
 var btn_target: Button
 var over_root: Control
 var lbl_over_title: Label
@@ -548,6 +549,11 @@ func _build_info_bar(root: Control) -> void:
 	btn_target.pressed.connect(game._cycle_target_mode)
 	right.add_child(btn_target)
 
+	btn_move = _button("Move", 13, Vector2(118.0, 30.0))
+	btn_move.tooltip_text = "Pick this tower up and put it somewhere else. Free, once a wave, between waves."
+	btn_move.pressed.connect(game.begin_move)
+	right.add_child(btn_move)
+
 	btn_sell = _button("Sell", 13, Vector2(118.0, 34.0))
 	btn_sell.pressed.connect(game._sell_selected)
 	right.add_child(btn_sell)
@@ -689,6 +695,7 @@ func refresh_info(hovered_type: String = "") -> void:
 	for b: Button in track_buttons:
 		b.visible = false
 	btn_sell.visible = false
+	btn_move.visible = false
 	btn_target.visible = false
 	info_hover.text = ""
 
@@ -789,6 +796,10 @@ func show_selected_info() -> void:
 
 	btn_sell.visible = true
 	btn_sell.text = "Sell  +$%d" % game.selected.sell_value()
+	btn_move.visible = true
+	btn_move.disabled = not game.can_move_selected()
+	btn_move.text = "Move" if game.can_move_selected() \
+			else ("Moving…" if game.moving != null else "Move (next wave)")
 	btn_target.visible = true
 	btn_target.disabled = game.selected.is_support()
 	btn_target.text = "Target: %s" % game.selected.target_mode_name()
