@@ -35,6 +35,8 @@ var burn_source: Node = null
 var hit_flash: float = 0.0
 ## How shove-resistant this creep currently is; see push_back().
 var push_fatigue: float = 0.0
+## Flyers cut across the map and can only be shot by towers that reach up.
+var flying: bool = false
 var slow_immune: bool = false
 var burn_immune: bool = false
 var heal: float = 0.0
@@ -84,7 +86,14 @@ func setup(k: String, hp_mult: float, speed_mult: float, points: PackedVector2Ar
 	charge_time = float(d.get("charge_time", 0.0))
 	charge_mult = float(d.get("charge_mult", 1.0))
 	charge_clock = randf() * maxf(0.1, charge_period)
-	path = points
+	flying = bool(d.get("flying", false))
+	if flying:
+		# Flyers ignore the road entirely: spawn point straight to the base.
+		# Reusing the same two-point polyline keeps progress, lanes, slows
+		# and leak handling exactly as they are for everything else.
+		path = PackedVector2Array([points[0], points[points.size() - 1]])
+	else:
+		path = points
 	walk_pos = path[0]
 	lane = randf_range(-1.0, 1.0) * (float(TDData.CELL) * 0.22 - radius * 0.35)
 	_sync_position()
@@ -256,7 +265,10 @@ func _leak() -> void:
 
 func _draw() -> void:
 	var bob := sin(wobble) * radius * 0.09
-	var body_pos := Vector2(0.0, bob)
+	# Flyers ride high above their shadow, which is how you tell at a glance
+	# that half your towers cannot touch them.
+	var lift := radius * 1.15 if flying else 0.0
+	var body_pos := Vector2(0.0, bob - lift)
 	var tint := color
 	if slow_timer > 0.0:
 		tint = tint.lerp(Color("6fd0ff"), 0.45)
@@ -267,9 +279,22 @@ func _draw() -> void:
 	if hit_flash > 0.0:
 		tint = tint.lerp(Color.WHITE, hit_flash * 0.8)
 
-	# Shadow.
-	draw_circle(Vector2(0.0, radius * 0.62), radius * 0.82, Color(0, 0, 0, 0.25))
+	# Shadow. A flyer's is smaller and darker, cast from further up.
+	if flying:
+		draw_circle(Vector2(0.0, radius * 0.62), radius * 0.5, Color(0, 0, 0, 0.35))
+	else:
+		draw_circle(Vector2(0.0, radius * 0.62), radius * 0.82, Color(0, 0, 0, 0.25))
 
+	if flying:
+		var beat := sin(wobble * 2.2) * 0.5 + 0.5
+		var span := radius * (1.5 + 0.35 * beat)
+		var wing := Color(tint.lightened(0.25), 0.8)
+		for side in [-1.0, 1.0]:
+			draw_colored_polygon(PackedVector2Array([
+				body_pos,
+				body_pos + Vector2(span * side, -radius * (0.5 + 0.35 * beat)),
+				body_pos + Vector2(span * side * 0.8, radius * 0.35),
+			]), wing)
 	if not Art.draw_centered(self, "enemy_" + kind, body_pos, radius * 2.3, 0.0, tint):
 		draw_circle(body_pos, radius, tint)
 		draw_arc(body_pos, radius, 0.0, TAU, 20, tint.darkened(0.5), 2.0, true)

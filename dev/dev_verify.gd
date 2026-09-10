@@ -210,6 +210,7 @@ func _ready() -> void:
 	_check_knockback_fatigue()
 	_check_save_versioning()
 	_check_wave_rules()
+	_check_flyers()
 	_check_enemy_kinds()
 	_check_cheats()
 	_check_audio()
@@ -1498,6 +1499,110 @@ func _check_targeting() -> void:
 
 
 
+
+
+
+
+## Flyers ignore the road and only half the roster can shoot at them.
+func _check_flyers() -> void:
+	var kinds: Array = []
+	for kind: String in TDData.ENEMIES:
+		if bool(TDData.ENEMIES[kind].get("flying", false)):
+			kinds.append(kind)
+	check("the roster has flyers (%d)" % kinds.size(), kinds.size() >= 2)
+
+	var saved: Array = game.enemies.duplicate()
+	game.enemies.clear()
+	game.invalidate_targeting_grid()
+	var road: PackedVector2Array = game.routes[0]
+	var flyer := Enemy.new()
+	flyer.setup(str(kinds[0]), 1.0, 1.0, road)
+	add_child(flyer)
+	check("a flyer's path is a straight line to the base",
+			flyer.path.size() == 2 and flyer.path[0] == road[0]
+			and flyer.path[1] == road[road.size() - 1])
+	check("which is shorter than the road it ignores",
+			road.size() < 3 or flyer.path[0].distance_to(flyer.path[1]) < _road_length(road))
+	var walker := Enemy.new()
+	walker.setup("grunt", 1.0, 1.0, road)
+	add_child(walker)
+	check("a ground creep still walks every corner", walker.path.size() == road.size())
+
+	# Put both in the same place and see who can shoot what.
+	var spot := Vector2(400.0, 400.0)
+	flyer.position = spot
+	walker.position = spot
+	game.enemies.append(flyer)
+	game.enemies.append(walker)
+	game.invalidate_targeting_grid()
+
+	var ground_only := Tower.new()
+	ground_only.game = game
+	ground_only.setup("cannon", Vector2i.ZERO)
+	ground_only.position = spot
+	var anti_air := Tower.new()
+	anti_air.game = game
+	anti_air.setup("gun", Vector2i.ZERO)
+	anti_air.position = spot
+	check("a ground tower knows it cannot reach up", not ground_only.hits_air())
+	check("and an anti-air one knows it can", anti_air.hits_air())
+	check("the ground tower picks the walker, not the flyer",
+			game.find_target(spot, 300.0, 0.0, TDData.Target.FIRST,
+					ground_only.hits_air()) == walker)
+	var seen: Array = game.find_targets(spot, 300.0, 8, 0.0, TDData.Target.FIRST,
+			ground_only.hits_air())
+	check("and never sees it in a chain either", not seen.has(flyer))
+	check("the anti-air tower sees both",
+			game.find_targets(spot, 300.0, 8, 0.0, TDData.Target.FIRST,
+					anti_air.hits_air()).size() == 2)
+
+	# Splash inherits the firer's reach: a shell cannot swat something overhead.
+	var before := flyer.hp
+	var walker_before := walker.hp
+	game.explode(spot, 120.0, 50.0, Color.WHITE, 0.0, 0.0, false, 1.0, null, 0.0, false)
+	check("a ground blast leaves flyers alone", is_equal_approx(flyer.hp, before))
+	check("while still hitting what is on the ground", walker.hp < walker_before)
+	game.explode(spot, 120.0, 50.0, Color.WHITE, 0.0, 0.0, false, 1.0, null, 0.0, true)
+	check("an anti-air blast does reach them", flyer.hp < before)
+
+	# The defence has to be mixed, but not impossible.
+	var can := 0
+	for type_id: String in TDData.TOWERS:
+		var probe := Tower.new()
+		probe.game = game
+		probe.setup(type_id, Vector2i.ZERO)
+		if probe.hits_air():
+			can += 1
+		probe.free()
+	check("roughly half the roster can answer an air wave (%d of %d)"
+			% [can, TDData.TOWERS.size()],
+			can >= 5 and can <= TDData.TOWERS.size() - 4)
+
+	# And they have to actually turn up in waves.
+	var air_waves := 0
+	for n in range(1, 31):
+		var comp: Dictionary = game.wave_composition(n)
+		for kind: String in kinds:
+			if comp.has(kind):
+				air_waves += 1
+				break
+	check("air waves appear through the run (%d of 30)" % air_waves, air_waves >= 6)
+
+	ground_only.free()
+	anti_air.free()
+	game.enemies.erase(flyer)
+	game.enemies.erase(walker)
+	flyer.queue_free()
+	walker.queue_free()
+	game.enemies.assign(saved)
+	game.invalidate_targeting_grid()
+
+
+func _road_length(points: PackedVector2Array) -> float:
+	var total := 0.0
+	for i in range(1, points.size()):
+		total += points[i - 1].distance_to(points[i])
+	return total
 
 
 ## Waves come from a table now. The base curve must be exactly what the old

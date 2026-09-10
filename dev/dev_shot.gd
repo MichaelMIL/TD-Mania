@@ -21,15 +21,28 @@ func _ready() -> void:
 	if args.has("--fill"):
 		game.gold = 999999
 		game.fill_with_random_towers()
-	if args.has("--wave"):
-		game._start_wave()
+	for i in args.size():
+		if args[i] == "--wave":
+			# "--wave 11" jumps to just before that wave and starts it.
+			if i + 1 < args.size() and args[i + 1].is_valid_int():
+				game.wave = int(args[i + 1]) - 1
+			game._start_wave()
 	for i in args.size():
 		if args[i] == "--panel" and i + 1 < args.size():
 			if args[i + 1] == "tuning" and game.tuning_panel != null:
 				game.tuning_panel.toggle()
 			elif args[i + 1] == "cheats" and game.cheats != null:
 				game.cheats.toggle()
-	await get_tree().create_timer(0.8).timeout
+	for i in args.size():
+		if args[i] == "--spawn" and i + 1 < args.size():
+			# Drops one creep of that kind on the board straight away.
+			for n in 4:
+				game.spawn_kind(args[i + 1])
+	var delay := 0.8
+	for i in args.size():
+		if args[i] == "--delay" and i + 1 < args.size():
+			delay = float(args[i + 1])
+	await get_tree().create_timer(delay).timeout
 	RenderingServer.frame_post_draw.connect(_grab, CONNECT_ONE_SHOT)
 
 

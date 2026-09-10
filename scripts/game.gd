@@ -1074,13 +1074,15 @@ static func target_score(e: Enemy, mode: int) -> float:
 
 ## Best creep in range under `mode` — by default the one closest to the base.
 func find_target(origin: Vector2, rng: float, min_rng: float = 0.0,
-		mode: int = TDData.Target.FIRST) -> Enemy:
+		mode: int = TDData.Target.FIRST, air_ok: bool = true) -> Enemy:
 	var best: Enemy = null
 	var best_score := -INF
 	var min_sq := min_rng * min_rng
 	for bucket: Array in _buckets(origin, rng):
 		for e: Enemy in bucket:
 			if not is_instance_valid(e) or e.dead:
+				continue
+			if e.flying and not air_ok:
 				continue
 			# Squared distances: no square root on the hottest loop in the game.
 			var reach := rng + e.radius * 0.5
@@ -1097,12 +1099,14 @@ func find_target(origin: Vector2, rng: float, min_rng: float = 0.0,
 ## Up to `count` enemies in range, ordered by path progress. Used by chaining
 ## beams and by hovering gunships.
 func find_targets(origin: Vector2, rng: float, count: int, min_rng: float = 0.0,
-		mode: int = TDData.Target.FIRST) -> Array:
+		mode: int = TDData.Target.FIRST, air_ok: bool = true) -> Array:
 	var found: Array = []
 	var min_sq := min_rng * min_rng
 	for bucket: Array in _buckets(origin, rng):
 		for e: Enemy in bucket:
 			if not is_instance_valid(e) or e.dead:
+				continue
+			if e.flying and not air_ok:
 				continue
 			var reach := rng + e.radius * 0.5
 			var dist_sq := origin.distance_squared_to(e.position)
@@ -1114,7 +1118,8 @@ func find_targets(origin: Vector2, rng: float, count: int, min_rng: float = 0.0,
 
 func explode(pos: Vector2, radius: float, damage: float, color: Color,
 		slow: float = 0.0, slow_dur: float = 0.0, pierce_armor: bool = false,
-		shatter: float = 1.0, source: Node = null, knockback: float = 0.0) -> void:
+		shatter: float = 1.0, source: Node = null, knockback: float = 0.0,
+		air_ok: bool = true) -> void:
 	fx_ring(pos, radius * 1.6, color)
 	Audio.play("explosion", -12.0 + minf(6.0, radius * 0.05))
 	if not is_instance_valid(source):
@@ -1122,6 +1127,8 @@ func explode(pos: Vector2, radius: float, damage: float, color: Color,
 	# enemies_near hands back a fresh array, so kills during the blast are safe.
 	for e: Enemy in enemies_near(pos, radius):
 		if not is_instance_valid(e) or e.dead:
+			continue
+		if e.flying and not air_ok:
 			continue
 		var dist := pos.distance_to(e.position) - e.radius
 		if dist > radius:
@@ -1432,6 +1439,7 @@ func _enemy_chip(kind: String, count: int) -> Control:
 
 	var dot := EnemyDot.new()
 	dot.tint = d["color"]
+	dot.winged = bool(d.get("flying", false))
 	dot.custom_minimum_size = Vector2(12.0, 12.0)
 	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(dot)
@@ -1736,6 +1744,8 @@ func _refresh_info(preview: String = "") -> void:
 		var where := "water only" if int(d["terrain"]) == TDData.Terrain.WATER else "dry ground"
 		if not Progress.tower_unlocked(type_id):
 			where = "locked until level %d" % Progress.tower_unlock_level(type_id)
+		if not bool(d.get("hits_air", false)) and not bool(d.get("air", false)):
+			where += ", ground only"
 		info_title.text = "%s  —  $%d  (%s)" % [d["name"], tower_cost(type_id), where]
 		var stats := "%s\n" % d["desc"]
 		if bool(d.get("support", false)):

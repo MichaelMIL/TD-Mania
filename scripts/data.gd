@@ -110,8 +110,12 @@ static var WAVE_RULES: Array = [
 		"count_every": 8, "gap": 1.6, "lead": 1.4},
 	{"kind": "thief", "from": 10, "every": 4, "offset": 0, "count": 1,
 		"count_every": 9, "gap": 0.5, "lead": 1.0},
+	{"kind": "moth", "from": 5, "every": 3, "offset": 2, "count": 3,
+		"count_every": 6, "gap": 0.45, "lead": 1.2},
 	{"kind": "warden", "from": 12, "count": 1, "count_every": 14,
 		"gap": 2.0, "lead": 1.6},
+	{"kind": "drake", "from": 14, "every": 2, "offset": 0, "count": 1,
+		"count_every": 12, "gap": 1.9, "lead": 1.5},
 	{"kind": "tank", "from": 6, "count": 1, "count_every": 5,
 		"gap": 1.8, "lead": 1.5},
 ]
@@ -864,6 +868,7 @@ static func tower_def(id: String) -> Dictionary:
 static var TOWERS: Dictionary = {
 	"gun": {
 		"name": "Gunner", "short": "Gunner", "cost": 60, "color": Color("4fc3f7"),
+		"hits_air": true,
 		"range": 132.0, "rate": 1.8, "damage": 11.0, "proj_speed": 540.0,
 		"splash": 0.0, "slow": 0.0, "slow_dur": 0.0,
 		"beam": false, "pierce_armor": false,
@@ -908,6 +913,7 @@ static var TOWERS: Dictionary = {
 	},
 	"frost": {
 		"name": "Frost", "short": "Frost", "cost": 95, "color": Color("81d4fa"),
+		"hits_air": true,
 		"range": 124.0, "rate": 1.0, "damage": 5.0, "proj_speed": 420.0,
 		"splash": 34.0, "slow": 0.45, "slow_dur": 1.8,
 		"beam": false, "pierce_armor": false,
@@ -931,6 +937,7 @@ static var TOWERS: Dictionary = {
 	},
 	"tesla": {
 		"name": "Tesla", "short": "Tesla", "cost": 175, "color": Color("ba68c8"),
+		"hits_air": true,
 		"range": 142.0, "rate": 1.0, "damage": 36.0, "proj_speed": 0.0,
 		"splash": 0.0, "slow": 0.0, "slow_dur": 0.0,
 		"beam": true, "pierce_armor": true,
@@ -950,6 +957,7 @@ static var TOWERS: Dictionary = {
 	},
 	"marksman": {
 		"name": "Marksman", "short": "Marksman", "cost": 190, "color": Color("9ccc65"),
+		"hits_air": true,
 		"range": 300.0, "rate": 0.5, "damage": 62.0, "proj_speed": 900.0,
 		"splash": 0.0, "slow": 0.0, "slow_dur": 0.0,
 		"beam": false, "pierce_armor": true, "pierce_count": 1,
@@ -1009,6 +1017,7 @@ static var TOWERS: Dictionary = {
 	},
 	"tide": {
 		"name": "Tide Caller", "short": "Tide", "cost": 150, "color": Color("26c6da"),
+		"hits_air": true,
 		"range": 205.0, "rate": 0.85, "damage": 30.0, "proj_speed": 380.0,
 		"splash": 46.0, "slow": 0.2, "slow_dur": 0.9,
 		"beam": false, "pierce_armor": false,
@@ -1047,6 +1056,7 @@ static var TOWERS: Dictionary = {
 	},
 	"airfield": {
 		"name": "Airfield", "short": "Airfield", "cost": 210, "color": Color("aed581"),
+		"hits_air": true,
 		"range": 340.0, "rate": 0.18, "damage": 58.0, "proj_speed": 0.0,
 		"splash": 62.0, "slow": 0.0, "slow_dur": 0.0,
 		"beam": false, "pierce_armor": false,
@@ -1069,6 +1079,7 @@ static var TOWERS: Dictionary = {
 	},
 	"helipad": {
 		"name": "Helipad", "short": "Helipad", "cost": 240, "color": Color("ffb74d"),
+		"hits_air": true,
 		"range": 300.0, "rate": 0.14, "damage": 15.0, "proj_speed": 620.0,
 		"splash": 0.0, "slow": 0.0, "slow_dur": 0.0,
 		"beam": false, "pierce_armor": false,
@@ -1149,6 +1160,7 @@ static var TOWERS: Dictionary = {
 	},
 	"ballista": {
 		"name": "Ballista", "short": "Ballista", "cost": 200, "color": Color("a1887f"),
+		"hits_air": true,
 		"range": 210.0, "rate": 0.55, "damage": 44.0, "proj_speed": 620.0,
 		"splash": 0.0, "slow": 0.0, "slow_dur": 0.0,
 		"beam": false, "pierce_armor": false, "pierce_count": 2, "volley": 2,
@@ -1169,6 +1181,7 @@ static var TOWERS: Dictionary = {
 	},
 	"laser": {
 		"name": "Focus Laser", "short": "Laser", "cost": 230, "color": Color("f06292"),
+		"hits_air": true,
 		"range": 150.0, "rate": 1.0, "damage": 22.0, "proj_speed": 0.0,
 		"splash": 0.0, "slow": 0.0, "slow_dur": 0.0,
 		"beam": true, "pierce_armor": true, "focus": 2.5, "focus_time": 3.0,
@@ -1273,6 +1286,18 @@ static var ENEMIES: Dictionary = {
 		"damage": 1, "radius": 11.0, "armor": 0.0, "color": Color("ffee58"),
 		"charge_period": 3.6, "charge_time": 1.0, "charge_mult": 2.1,
 		"note": "Sprints in bursts, so it crosses kill zones fast.",
+	},
+	"moth": {
+		"name": "Cinder Moth", "hp": 62.0, "speed": 74.0, "reward": 18, "damage": 1,
+		"radius": 11.0, "armor": 0.0, "color": Color("f06292"), "flying": true,
+		"burn_immune": true,
+		"note": "Flies straight at the base — only towers that reach up can hit it.",
+	},
+	"drake": {
+		"name": "Iron Drake", "hp": 340.0, "speed": 52.0, "reward": 46, "damage": 3,
+		"radius": 16.0, "armor": 6.0, "color": Color("7986cb"), "flying": true,
+		"slow_immune": true,
+		"note": "Armoured flyer that ignores the road and shrugs off slows.",
 	},
 	"thief": {
 		"name": "Cutpurse", "hp": 64.0, "speed": 122.0, "reward": 18,

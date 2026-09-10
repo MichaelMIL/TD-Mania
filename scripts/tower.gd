@@ -171,6 +171,12 @@ func focus_peak() -> float:
 	return base + float(mods().get("focus_add", 0.0)) if base > 1.0 else 1.0
 
 
+## Whether this tower can shoot at flyers at all. Roughly half the roster
+## can, so an air wave forces a mixed defence instead of more of the same.
+func hits_air() -> bool:
+	return bool(def().get("hits_air", false)) or is_air()
+
+
 func knockback() -> float:
 	return float(def().get("knockback", 0.0)) + float(mods().get("knockback_add", 0.0))
 
@@ -398,7 +404,7 @@ func _process(delta: float) -> void:
 	if target == null:
 		# Losing the target resets a focusing beam's ramp.
 		focus_time = 0.0
-		target = game.find_target(position, rng, min_rng, target_mode)
+		target = game.find_target(position, rng, min_rng, target_mode, hits_air())
 
 	beam_on = false
 	beam_targets.clear()
@@ -426,7 +432,7 @@ func _process(delta: float) -> void:
 func _process_field(delta: float) -> void:
 	field_pulse += delta
 	var rng := stat("range")
-	for e: Enemy in game.find_targets(position, rng, 64, 0.0, target_mode):
+	for e: Enemy in game.find_targets(position, rng, 64, 0.0, target_mode, hits_air()):
 		if is_instance_valid(e) and not e.dead:
 			e.apply_slow(slow_factor(), maxf(0.25, slow_duration()))
 
@@ -438,20 +444,22 @@ func _process_pulse(delta: float) -> void:
 		return
 	cooldown = 1.0 / maxf(0.05, stat("rate"))
 	recoil = 1.0
-	var hit: Array = game.find_targets(position, stat("range"), 64, 0.0, target_mode)
+	var hit: Array = game.find_targets(position, stat("range"), 64, 0.0, target_mode,
+			hits_air())
 	if hit.is_empty():
 		cooldown = 0.25
 		return
 	Audio.play("shot_cannon", -10.0)
 	game.explode(position, splash(), stat("damage"), def()["color"], slow_factor(),
-			slow_duration(), pierces(), shatter(), self)
+			slow_duration(), pierces(), shatter(), self, 0.0, hits_air())
 
 
 func _process_beam(delta: float, rng: float) -> void:
 	beam_on = true
 	beam_flicker += delta * 30.0
 	Audio.beam_active(1)
-	beam_targets = game.find_targets(position, rng, chain(), min_range(), target_mode)
+	beam_targets = game.find_targets(position, rng, chain(), min_range(), target_mode,
+			hits_air())
 	# A focusing beam ramps up while it stays on the same creep.
 	var ramp := 1.0
 	if focus_peak() > 1.0:
@@ -479,7 +487,8 @@ func _process_air(delta: float) -> void:
 	cooldown = maxf(0.0, cooldown - delta)
 	if units.size() >= unit_count() or cooldown > 0.0:
 		return
-	var prey: Enemy = game.find_target(position, stat("range"), min_range(), target_mode)
+	var prey: Enemy = game.find_target(position, stat("range"), min_range(), target_mode,
+			hits_air())
 	if prey == null:
 		return
 	var craft := Aircraft.new()
@@ -507,7 +516,7 @@ func _process_air(delta: float) -> void:
 ## Fires one bolt at each of several creeps at once.
 func _fire_volley() -> void:
 	var picks: Array = game.find_targets(position, stat("range"), volley(), min_range(),
-			target_mode)
+			target_mode, hits_air())
 	var keep := target
 	for e: Enemy in picks:
 		target = e
@@ -551,6 +560,7 @@ func _shoot(delay: float) -> void:
 	p.max_travel = stat("range") * 1.35
 	p.color = def()["color"]
 	p.source = self
+	p.hits_air = hits_air()
 	p.radius = 3.0 + splash() * 0.06
 	var spread := (randf() - 0.5) * 0.12 if shots() > 1 else 0.0
 	p.position = position + Vector2(20.0 - delay * 60.0, 0.0).rotated(turret_angle + spread)

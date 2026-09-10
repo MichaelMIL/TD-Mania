@@ -50,10 +50,15 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
 
 ## Depth
 
-- [ ] **Flying enemies.** The classic counter-mechanic the game lacks: ignore
-      the road, fly straight at the base. Makes Airfield/Helipad and
-      long-range towers matter and forces a diversified build. Touches
-      `enemy.gd` (movement), `game.gd` (targeting/leaks) and wave tables.
+- [x] **Flying enemies.** *Implemented 2026-09-10.* Cinder Moth (fast,
+      fireproof, packs from wave 5) and Iron Drake (armoured, slow-immune,
+      from wave 14) fly straight from spawn to base — `flying` in `ENEMIES`
+      swaps the road for a two-point line, so lanes, slows, progress and
+      leaks all still work. Towers need `hits_air` to touch them (9 of 18,
+      plus the aircraft pads), and splash inherits the firer's reach, so a
+      mortar shell under a Drake does nothing. Flyers are drawn lifted with
+      wings over a hard shadow, their readout chips are winged, and the
+      palette marks ground-only towers.
 - [ ] **Per-map objectives and stars.** All 20 maps currently say "go as deep
       as you can". Add goals like *survive 15 waves*, *lose no lives*, *clear
       it without water towers*, stored per map in `progress.gd` alongside the

@@ -344,6 +344,22 @@ then an outer ring as the total investment rises.
 | Helipad | Autocannon (4), Ammo Belts (3), Uprated Rotors (3), Wing Escort (1) | — |
 | Command Post | Doctrine (3), Logistics (3), Comms Array (3) | — |
 
+### Flyers
+
+Two creeps ignore the road entirely and fly straight from the spawn portal to
+the base: the **Cinder Moth** (fast, fireproof, arrives in packs from wave 5)
+and the **Iron Drake** (armoured, slow-immune, from wave 14). They are drawn
+lifted above a small hard shadow, with beating wings, and their chips in the
+wave readout are winged too.
+
+Only about half the roster can shoot upwards — `"hits_air": true` in `TOWERS`,
+plus the Airfield and Helipad, which are aircraft themselves. Gunner, Frost,
+Tesla, Marksman, Focus Laser, Ballista and Tide Caller can; lobbed and
+ground-slam weapons (Cannon, Mortar, Shockwave, Wave Cannon, Torpedo,
+Flamethrower) cannot, and neither can their splash — a shell that lands under
+a Drake does nothing to it. The palette says "ground only" for those, so an
+air wave forces a mixed defence rather than more of the same tower.
+
 ### Wave tables
 
 Waves are built from data, not code: `TDData.WAVE_RULES` holds one rule per

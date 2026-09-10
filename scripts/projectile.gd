@@ -6,6 +6,9 @@ extends Node2D
 
 var game: Node = null
 var source: Node = null
+## Whether the tower that fired this can reach flyers; its splash inherits
+## the same limit, so a mortar's blast cannot swat something overhead.
+var hits_air: bool = true
 var target: Enemy = null
 var dest: Vector2 = Vector2.ZERO
 var damage: float = 10.0
@@ -72,7 +75,7 @@ func _process_piercing(delta: float) -> void:
 
 	# Only creeps near the segment just flown can be struck by it.
 	for e: Enemy in game.enemies_near(position - motion * 0.5, motion.length() * 0.5 + radius):
-		if hit.has(e):
+		if hit.has(e) or (e.flying and not hits_air):
 			continue
 		# Segment/circle test so fast shots cannot tunnel past a creep.
 		var closest: Vector2 = Geometry2D.get_closest_point_to_segment(
@@ -99,13 +102,13 @@ func _process_piercing(delta: float) -> void:
 func _impact() -> void:
 	if splash > 0.0:
 		game.explode(position, splash, damage, color, slow, slow_dur, pierce_armor, shatter,
-				source, knockback)
+				source, knockback, hits_air)
 		# Cluster munitions scatter smaller secondary blasts around the impact.
 		for i in cluster:
 			var offset := Vector2.RIGHT.rotated(TAU * float(i) / float(cluster)) \
 					* splash * 0.75
 			game.explode(position + offset, splash * 0.55, damage * 0.4, color,
-					slow, slow_dur, pierce_armor, shatter, source)
+					slow, slow_dur, pierce_armor, shatter, source, 0.0, hits_air)
 	elif is_instance_valid(target) and not target.dead:
 		var dmg := damage
 		if shatter > 1.0 and target.slow_timer > 0.0:
