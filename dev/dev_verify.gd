@@ -2314,6 +2314,32 @@ func _check_tuning() -> void:
 	panel._nudge("damage", -1.0)
 	check("with the scope flipped it writes the level layer",
 			Tuning.level_values.has(level))
+	# Every row must explain itself, or the panel is only usable by someone
+	# who already knows the codebase.
+	var unexplained: Array = []
+	var subjects: Array = ["gun", "mortar", Tuning.enemy_subject("warden"),
+			Tuning.enemy_subject("mender"), Tuning.track_subject("gun", 0),
+			Tuning.track_subject("tesla", 1)]
+	for subject: String in subjects:
+		for row: Dictionary in Tuning.rows_for(subject):
+			var info := str(row.get("info", ""))
+			if info.length() < 20:
+				unexplained.append("%s/%s" % [subject, row["key"]])
+	check("every tunable row carries an explanation (%s)"
+			% ", ".join(unexplained), unexplained.is_empty())
+	check("a modifier explains what a rank of the track does",
+			str(Tuning.rows_for(Tuning.track_subject("gun", 0))[-1].get("info", ""))
+					.contains("rank"))
+	var blurbs: Array = []
+	for subject: String in subjects:
+		if Tuning.describe(subject).strip_edges().length() < 12:
+			blurbs.append(subject)
+	check("and every subject says what it is (%s)" % ", ".join(blurbs),
+			blurbs.is_empty())
+	check("an upgrade's description covers its ranks and its capstone",
+			Tuning.describe(Tuning.track_subject("cannon", 0)).contains("ranks")
+			and Tuning.describe(Tuning.track_subject("cannon", 0)).contains("Siege"))
+
 	# Back to the global layer; the scope was flipped a few lines above.
 	panel.scope_level = -1
 

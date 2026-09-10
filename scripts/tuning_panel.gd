@@ -21,6 +21,7 @@ var panel: PanelContainer
 var list_col: VBoxContainer
 var rows_col: VBoxContainer
 var title: Label
+var blurb: Label
 var status: Label
 var scope_button: Button
 
@@ -155,6 +156,11 @@ func _build() -> void:
 	split.add_child(right)
 	title = _label("", 15, Color("e0f7fa"))
 	right.add_child(title)
+	# What the thing being edited actually is, in words.
+	blurb = _label("", 11, Color(1, 1, 1, 0.55))
+	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	blurb.custom_minimum_size = Vector2(0.0, 30.0)
+	right.add_child(blurb)
 	var rows_scroll := ScrollContainer.new()
 	rows_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	rows_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -231,6 +237,18 @@ func _build_rows() -> void:
 		var name_label := _label(str(row["name"]), 13, Color(1, 1, 1, 0.75))
 		name_label.custom_minimum_size = Vector2(96.0, 0.0)
 		line.add_child(name_label)
+		# An "i" that explains the stat on hover, so tuning does not require
+		# knowing the codebase.
+		var info := Button.new()
+		info.text = "i"
+		info.flat = true
+		info.custom_minimum_size = Vector2(20.0, 26.0)
+		info.add_theme_font_size_override("font_size", 12)
+		info.add_theme_color_override("font_color", Color("4dd0e1"))
+		info.focus_mode = Control.FOCUS_NONE
+		info.mouse_filter = Control.MOUSE_FILTER_STOP
+		info.tooltip_text = str(row.get("info", str(row["name"])))
+		line.add_child(info)
 		var minus := _small_button("−", 30.0)
 		minus.pressed.connect(_nudge.bind(key, -1.0))
 		line.add_child(minus)
@@ -280,6 +298,7 @@ func _refresh_values() -> void:
 				else Color.WHITE
 	title.text = "%s — %s" % [Tuning.label_of(current),
 			"tuned" if not Tuning.effective(current, level_id()).is_empty() else "stock"]
+	blurb.text = Tuning.describe(current)
 
 
 func _select_tower(type_id: String) -> void:

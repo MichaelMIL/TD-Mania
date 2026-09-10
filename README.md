@@ -590,6 +590,13 @@ editor, which covers three kinds of subject:
   and the trait numbers that decide how a kind must be answered: heal rate
   and range, gold stolen, how many it splits into, sprint timing.
 
+Every row carries an **i** that explains the stat on hover — what armour
+does to small fast shots, why range usually beats damage, what a `_mult`
+modifier compounds to — and the line under the title says what the subject
+is: a tower's blurb, a creep's note and traits, or an upgrade track spelled
+out in full ("4 ranks, each +22% damage. Last rank also: Sabot Rounds —
+rounds punch through armor").
+
 Pick a subject on the left, nudge with `−` / `+`, and the change takes
 effect immediately — towers and creeps re-read their numbers every frame,
 the palette reprices itself, and an installed rank changes under a tower

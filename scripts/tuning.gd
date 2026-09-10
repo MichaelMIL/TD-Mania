@@ -26,47 +26,79 @@ const TRACK_PREFIX := "track:"
 ## The stats worth exposing, in the order the panel lists them, with the step
 ## a single click moves them by. A tower only shows the ones it defines.
 const TUNABLE: Array = [
-	{"key": "damage", "name": "Damage", "step": 1.0, "min": 0.0, "max": 400.0},
-	{"key": "rate", "name": "Fire rate", "step": 0.05, "min": 0.05, "max": 8.0},
-	{"key": "range", "name": "Range", "step": 5.0, "min": 40.0, "max": 600.0},
-	{"key": "cost", "name": "Cost", "step": 5.0, "min": 5.0, "max": 2000.0},
-	{"key": "splash", "name": "Splash", "step": 4.0, "min": 0.0, "max": 260.0},
-	{"key": "slow", "name": "Slow", "step": 0.05, "min": 0.0, "max": 0.85},
-	{"key": "slow_dur", "name": "Slow time", "step": 0.1, "min": 0.0, "max": 8.0},
-	{"key": "knockback", "name": "Knockback", "step": 4.0, "min": 0.0, "max": 200.0},
-	{"key": "proj_speed", "name": "Shot speed", "step": 20.0, "min": 60.0, "max": 1600.0},
-	{"key": "min_range", "name": "Dead zone", "step": 5.0, "min": 0.0, "max": 300.0},
-	{"key": "beam_dps", "name": "Beam DPS", "step": 2.0, "min": 0.0, "max": 400.0},
-	{"key": "income", "name": "Income", "step": 1.0, "min": 0.0, "max": 200.0},
-	{"key": "units", "name": "Aircraft", "step": 1.0, "min": 1.0, "max": 6.0},
-	{"key": "volley", "name": "Volley", "step": 1.0, "min": 1.0, "max": 12.0},
-	{"key": "chain", "name": "Chain", "step": 1.0, "min": 1.0, "max": 12.0},
-	{"key": "pierce_count", "name": "Pierce", "step": 1.0, "min": 1.0, "max": 12.0},
+	{"key": "damage", "name": "Damage", "step": 1.0, "min": 0.0, "max": 400.0,
+		"info": "Damage per shot, before armour. Armour comes off every hit, so small fast shots suffer most."},
+	{"key": "rate", "name": "Fire rate", "step": 0.05, "min": 0.05, "max": 8.0,
+		"info": "Shots a second. Damage x rate is raw output; the two trade off for DPS but not for feel."},
+	{"key": "range", "name": "Range", "step": 5.0, "min": 40.0, "max": 600.0,
+		"info": "How far it reaches, in pixels — a cell is 64. Range decides how much road a tower covers, which usually matters more than damage."},
+	{"key": "cost", "name": "Cost", "step": 5.0, "min": 5.0, "max": 2000.0,
+		"info": "Gold to build. Also scales every upgrade rank, which are priced as a share of it."},
+	{"key": "splash", "name": "Splash", "step": 4.0, "min": 0.0, "max": 260.0,
+		"info": "Blast radius in pixels. Damage falls off to 35% at the edge."},
+	{"key": "slow", "name": "Slow", "step": 0.05, "min": 0.0, "max": 0.85,
+		"info": "How much a hit slows, as a fraction: 0.25 leaves the creep at 75% speed."},
+	{"key": "slow_dur", "name": "Slow time", "step": 0.1, "min": 0.0, "max": 8.0,
+		"info": "How long that slow lasts, in seconds."},
+	{"key": "knockback", "name": "Knockback", "step": 4.0, "min": 0.0, "max": 200.0,
+		"info": "How far a hit shoves a creep back down the road. Creeps build resistance to repeated shoves."},
+	{"key": "proj_speed", "name": "Shot speed", "step": 20.0, "min": 60.0, "max": 1600.0,
+		"info": "How fast the shot flies. Slow shots trail fast creeps and miss."},
+	{"key": "min_range", "name": "Dead zone", "step": 5.0, "min": 0.0, "max": 300.0,
+		"info": "A hole in the middle it cannot shoot into — what long-range towers pay for their reach."},
+	{"key": "beam_dps", "name": "Beam DPS", "step": 2.0, "min": 0.0, "max": 400.0,
+		"info": "Damage a second while the beam holds on a target."},
+	{"key": "income", "name": "Income", "step": 1.0, "min": 0.0, "max": 200.0,
+		"info": "Gold paid at the end of every wave, whatever happens on the board."},
+	{"key": "units", "name": "Aircraft", "step": 1.0, "min": 1.0, "max": 6.0,
+		"info": "How many aircraft the pad keeps in the air at once."},
+	{"key": "volley", "name": "Volley", "step": 1.0, "min": 1.0, "max": 12.0,
+		"info": "How many separate creeps one salvo fires at."},
+	{"key": "chain", "name": "Chain", "step": 1.0, "min": 1.0, "max": 12.0,
+		"info": "How many creeps the beam splits between."},
+	{"key": "pierce_count", "name": "Pierce", "step": 1.0, "min": 1.0, "max": 12.0,
+		"info": "How many creeps one shot passes through before stopping."},
 ]
 
 ## Creep numbers. Health and speed carry the difficulty of a wave; the rest
 ## decide how a kind has to be answered.
 const ENEMY_TUNABLE: Array = [
-	{"key": "hp", "name": "Health", "step": 5.0, "min": 1.0, "max": 20000.0},
-	{"key": "speed", "name": "Speed", "step": 2.0, "min": 5.0, "max": 400.0},
-	{"key": "armor", "name": "Armour", "step": 1.0, "min": 0.0, "max": 200.0},
-	{"key": "reward", "name": "Bounty", "step": 1.0, "min": 0.0, "max": 2000.0},
-	{"key": "damage", "name": "Lives lost", "step": 1.0, "min": 0.0, "max": 50.0},
-	{"key": "radius", "name": "Size", "step": 1.0, "min": 4.0, "max": 60.0},
-	{"key": "heal", "name": "Heal rate", "step": 2.0, "min": 0.0, "max": 400.0},
-	{"key": "heal_range", "name": "Heal range", "step": 5.0, "min": 0.0, "max": 400.0},
-	{"key": "steal_gold", "name": "Gold stolen", "step": 5.0, "min": 0.0, "max": 999.0},
-	{"key": "split_count", "name": "Splits into", "step": 1.0, "min": 0.0, "max": 12.0},
-	{"key": "charge_period", "name": "Sprint every", "step": 0.2, "min": 0.2, "max": 30.0},
-	{"key": "charge_time", "name": "Sprint for", "step": 0.1, "min": 0.1, "max": 10.0},
-	{"key": "charge_mult", "name": "Sprint speed", "step": 0.1, "min": 1.0, "max": 6.0},
+	{"key": "hp", "name": "Health", "step": 5.0, "min": 1.0, "max": 20000.0,
+		"info": "Health at wave 1. Every wave multiplies it, so a change here compounds across the run."},
+	{"key": "speed", "name": "Speed", "step": 2.0, "min": 5.0, "max": 400.0,
+		"info": "Pixels a second. Speed decides how long it spends inside a kill zone, which is as good as health."},
+	{"key": "armor", "name": "Armour", "step": 1.0, "min": 0.0, "max": 200.0,
+		"info": "Comes off every hit that is not armour-piercing. Brutal against fast weak shots, barely felt by heavy ones."},
+	{"key": "reward", "name": "Bounty", "step": 1.0, "min": 0.0, "max": 2000.0,
+		"info": "Gold paid for the kill — the main dial on how rich a run feels."},
+	{"key": "damage", "name": "Lives lost", "step": 1.0, "min": 0.0, "max": 50.0,
+		"info": "Lives lost if it reaches the base."},
+	{"key": "radius", "name": "Size", "step": 1.0, "min": 4.0, "max": 60.0,
+		"info": "How big it is: its hitbox for splash, and for the cursor."},
+	{"key": "heal", "name": "Heal rate", "step": 2.0, "min": 0.0, "max": 400.0,
+		"info": "Health a second it restores to wounded creeps nearby."},
+	{"key": "heal_range", "name": "Heal range", "step": 5.0, "min": 0.0, "max": 400.0,
+		"info": "How far that healing reaches, in pixels."},
+	{"key": "steal_gold", "name": "Gold stolen", "step": 5.0, "min": 0.0, "max": 999.0,
+		"info": "Gold taken from you if it gets through."},
+	{"key": "split_count", "name": "Splits into", "step": 1.0, "min": 0.0, "max": 12.0,
+		"info": "How many smaller creeps it breaks into when killed."},
+	{"key": "charge_period", "name": "Sprint every", "step": 0.2, "min": 0.2, "max": 30.0,
+		"info": "Seconds between sprint bursts."},
+	{"key": "charge_time", "name": "Sprint for", "step": 0.1, "min": 0.1, "max": 10.0,
+		"info": "How long a sprint burst lasts."},
+	{"key": "charge_mult", "name": "Sprint speed", "step": 0.1, "min": 1.0, "max": 6.0,
+		"info": "Speed multiplier during a burst."},
 ]
 
 ## What an upgrade track exposes beyond its modifiers.
 const TRACK_TUNABLE: Array = [
-	{"key": "max", "name": "Ranks", "step": 1.0, "min": 1.0, "max": 8.0},
-	{"key": "cost_frac", "name": "Cost share", "step": 0.05, "min": 0.05, "max": 3.0},
-	{"key": "level", "name": "Unlocks at", "step": 1.0, "min": 1.0, "max": 60.0},
+	{"key": "max", "name": "Ranks", "step": 1.0, "min": 1.0, "max": 8.0,
+		"info": "How many ranks this track has. Each rank costs more coins than the last, and more gold to install."},
+	{"key": "cost_frac", "name": "Cost share", "step": 0.05, "min": 0.05, "max": 3.0,
+		"info": "What a rank costs, as a share of the tower's price — both the coin price in the tech tree and the gold price in a match."},
+	{"key": "level", "name": "Unlocks at", "step": 1.0, "min": 1.0, "max": 60.0,
+		"info": "Account level this track unlocks at."},
 ]
 
 ## Global overrides, then per-level ones layered on top:
@@ -295,9 +327,58 @@ static func rows_for(subject: String) -> Array:
 ## A sensible step for a modifier, from what kind of modifier it is: a
 ## multiplier moves in percents, an addition in small absolute steps.
 static func _mod_row(key: String, value: float) -> Dictionary:
-	var name := key.substr(5).replace("_", " ")
-	if key.ends_with("_mult"):
-		return {"key": key, "name": name, "step": 0.02, "min": 0.1, "max": 4.0}
+	var mod_key := key.substr(5)
+	var name := mod_key.replace("_", " ")
+	# The game already knows how to say what a modifier does; borrow it.
+	var effect := TDData.describe_mods({mod_key: value})
+	var info := "What one rank of this track does: %s." % effect if effect != "" \
+			else "What one rank of this track changes."
+	if mod_key.ends_with("_mult"):
+		info += " A multiplier applied once per rank, so 1.22 is +22% a rank and compounds."
+	elif mod_key.ends_with("_add"):
+		info += " Added once per rank."
+	if mod_key.ends_with("_mult"):
+		return {"key": key, "name": name, "step": 0.02, "min": 0.1, "max": 4.0,
+			"info": info}
 	if absf(value) >= 10.0:
-		return {"key": key, "name": name, "step": 1.0, "min": -400.0, "max": 400.0}
-	return {"key": key, "name": name, "step": 0.02, "min": -20.0, "max": 20.0}
+		return {"key": key, "name": name, "step": 1.0, "min": -400.0, "max": 400.0,
+			"info": info}
+	return {"key": key, "name": name, "step": 0.02, "min": -20.0, "max": 20.0,
+		"info": info}
+
+
+## What the subject as a whole is and does, shown under the panel title:
+## a tower's blurb, a creep's note, or the full text of an upgrade track.
+static func describe(subject: String) -> String:
+	if is_enemy(subject):
+		var kind := subject.trim_prefix(ENEMY_PREFIX)
+		var d: Dictionary = TDData.ENEMIES.get(kind, {})
+		var traits: Array = []
+		if bool(d.get("flying", false)):
+			traits.append("flies over the road")
+		if bool(d.get("slow_immune", false)):
+			traits.append("ignores slows")
+		if bool(d.get("burn_immune", false)):
+			traits.append("ignores fire")
+		var text := str(d.get("note", ""))
+		if not traits.is_empty():
+			text += "  (%s)" % ", ".join(traits)
+		return text.strip_edges()
+	if is_track(subject):
+		var body := subject.trim_prefix(TRACK_PREFIX).split("#")
+		if body.size() != 2 or not TDData.TOWERS.has(body[0]):
+			return ""
+		var track: Dictionary = TDData.TOWERS[body[0]]["tracks"][int(body[1])]
+		var text := "%d ranks, each %s." % [int(track["max"]),
+				TDData.describe_mods(track["mods"])]
+		if track.has("requires"):
+			var need: Dictionary = track["requires"]
+			text += " Needs %s rank %d first." % [need.get("track", ""),
+					int(need.get("rank", 1))]
+		if int(track.get("level", 0)) > 1:
+			text += " Unlocks at account level %d." % int(track["level"])
+		if track.has("capstone"):
+			text += "  Last rank also: %s — %s" % [track["capstone"]["name"],
+					track["capstone"]["desc"]]
+		return text
+	return str(TDData.TOWERS.get(subject, {}).get("desc", ""))
