@@ -191,7 +191,7 @@ the bonus for starting a wave early.
 
 ### Areas
 
-The twenty maps are grouped into five collapsible areas of four, each with its own
+The thirty maps are grouped into five collapsible areas of six, each with its own
 banner on the menu (click the +/- to fold one away). Maps unlock with account
 level — Verdant Pass at level 1 through Convergence at 18 — and a locked card
 shows the level it needs instead of a Play button. Areas whose maps are all
@@ -846,6 +846,9 @@ godot --headless --fixed-fps 60 --quit-after 20000 dev/dev_smoke.tscn
 godot --headless --fixed-fps 5 --quit-after 900000 dev/dev_report.tscn -- --runs 2
                                         # balance report: every map, several
                                         # runs, and whether the ladder holds
+godot --headless --quit-after 400 dev/dev_maps.tscn
+                                        # road length and firing positions per
+                                        # map, and the band each tier occupies
 dev/run_checks.sh                       # all of the above, failing on any
                                         # engine error as well as any FAIL
 SHOT_PATH=/tmp/shot.png godot --quit-after 600 dev/dev_shot.tscn -- --panel tuning

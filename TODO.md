@@ -4,9 +4,9 @@ Suggestions for where to take the game next, ordered by what I think returns
 the most for the effort. Every item notes the code it touches so it can be
 picked up cold.
 
-State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
-3 save slots, account levels + coin tech tree, 292 passing assertions in
-`dev/dev_verify.tscn` plus the air and balance harnesses.
+State at time of writing: 30 maps in 5 areas, 18 towers, 14 enemy kinds,
+3 save slots, account levels + coin tech tree, 554 passing assertions in
+`dev/dev_verify.tscn` plus the air, smoke, report and balance harnesses.
 
 ## Do these first
 
@@ -198,6 +198,16 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
       Game speed is now unlocked by **Field Tempo** in the tech tree (2x,
       then 3x) rather than given away. The tuning panel gained **Export**
       and **Import** for sharing a set of numbers as JSON.
+
+- [x] **Two more maps in every area.** *Implemented 2026-09-11.* Thirty maps
+      now, six per area: Willow Bend and Orchard Rows (Greenlands), Millrace
+      and Heron Flats (Riverlands), Sunken Quarry and Glass Flats (Wastes),
+      Drift Floes and Whiteout Ridge (Frozen Coast), Foundry Yard and Tidal
+      Locks (Iron Delta). Each was laid out against the ladder before it was
+      written — `dev/dev_maps.tscn` measures road length and firing
+      positions per map — and each brought its own road surface and decor
+      motif (ten of each, new in `map.gd`), since the suite requires every
+      map to look like itself.
 
 ## Notes
 

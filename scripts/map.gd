@@ -133,6 +133,105 @@ func _draw_path_surface(cell: float, pal: Dictionary) -> void:
 					var t := (float(i) - 1.0) * cell * 0.3
 					draw_line(at + along * t - across * cell * 0.24,
 							at + along * t + across * cell * 0.24, edge, 3.0)
+			"towpath":
+				# A beaten rut down the middle with grass creeping in.
+				var rut := Vector2(1.0, 0.0) if horizontal else Vector2(0.0, 1.0)
+				draw_line(at - rut * cell * 0.45, at + rut * cell * 0.45,
+						edge.lightened(0.12), cell * 0.16)
+				for i in 4:
+					draw_circle(at + Vector2(_hash01(key, i) - 0.5,
+							_hash01(key, i + 11) - 0.5) * cell * 0.8, 1.4,
+							Color(0.45, 0.55, 0.3, 0.35))
+			"chalk":
+				# Pale dust, wheel-worn at the edges.
+				draw_rect(Rect2(at - Vector2(cell, cell) * 0.34,
+						Vector2(cell, cell) * 0.68), Color(1, 1, 1, 0.05))
+				for side: float in [-0.26, 0.26]:
+					if horizontal:
+						draw_line(at + Vector2(-cell * 0.5, cell * side),
+								at + Vector2(cell * 0.5, cell * side),
+								edge.lightened(0.2), 2.0)
+					else:
+						draw_line(at + Vector2(cell * side, -cell * 0.5),
+								at + Vector2(cell * side, cell * 0.5),
+								edge.lightened(0.2), 2.0)
+			"causeway":
+				# Big stones with the waterline stained across them.
+				var block := Rect2(at - Vector2(cell, cell) * 0.42,
+						Vector2(cell, cell) * 0.84)
+				draw_rect(block, fill.lightened(0.04))
+				draw_rect(block, edge, false, 1.5)
+				draw_line(at + Vector2(-cell * 0.42, cell * 0.2),
+						at + Vector2(cell * 0.42, cell * 0.2),
+						Color(0.2, 0.4, 0.45, 0.35), 3.0)
+			"reedmat":
+				# Woven matting: two directions of weave.
+				for i in 4:
+					var t := (float(i) + 0.5) / 4.0 - 0.5
+					draw_line(at + Vector2(t * cell, -cell * 0.42),
+							at + Vector2(t * cell, cell * 0.42),
+							edge.lightened(0.15), 1.5)
+					draw_line(at + Vector2(-cell * 0.42, t * cell),
+							at + Vector2(cell * 0.42, t * cell),
+							fill.darkened(0.12), 1.5)
+			"haulroad":
+				# Two tyre tracks, and spoil kicked out to the sides.
+				var along := Vector2(1.0, 0.0) if horizontal else Vector2(0.0, 1.0)
+				var across := along.orthogonal()
+				for side: float in [-0.2, 0.2]:
+					draw_line(at + along * -cell * 0.5 + across * cell * side,
+							at + along * cell * 0.5 + across * cell * side,
+							edge.darkened(0.1), cell * 0.14)
+				for i in 5:
+					draw_circle(at + Vector2(_hash01(key, i) - 0.5,
+							_hash01(key, i + 17) - 0.5) * cell * 0.9, 1.3,
+							fill.lightened(0.2))
+			"saltcrust":
+				# Dried polygons, the way a salt pan cracks.
+				for iy in 2:
+					for ix in 2:
+						var cellet := at + Vector2(float(ix) - 0.5, float(iy) - 0.5) \
+								* cell * 0.42
+						draw_arc(cellet, cell * 0.19, 0.0, TAU, 6,
+								Color(1, 1, 1, 0.12), 1.0, true)
+				draw_circle(at, cell * 0.05, Color(1, 1, 1, 0.10))
+			"snowpack":
+				# Packed snow with a sled groove down it.
+				draw_rect(Rect2(at - Vector2(cell, cell) * 0.36,
+						Vector2(cell, cell) * 0.72), Color(1, 1, 1, 0.07))
+				var groove := Vector2(1.0, 0.0) if horizontal else Vector2(0.0, 1.0)
+				draw_line(at - groove * cell * 0.45, at + groove * cell * 0.45,
+						Color(0.75, 0.85, 0.95, 0.35), 2.0, true)
+			"glaze":
+				# Wind-polished blue ice, striated along the slope.
+				draw_rect(Rect2(at - Vector2(cell, cell) * 0.4,
+						Vector2(cell, cell) * 0.8), Color(0.6, 0.8, 1.0, 0.10))
+				for i in 3:
+					var y := at.y - cell * 0.3 + cell * 0.3 * float(i)
+					draw_line(Vector2(at.x - cell * 0.42, y + _hash01(key, i) * 3.0),
+							Vector2(at.x + cell * 0.42, y - _hash01(key, i + 5) * 3.0),
+							Color(0.85, 0.95, 1.0, 0.25), 1.0, true)
+			"cinder":
+				# Crushed clinker, still warm in places.
+				for i in 9:
+					var grain := at + Vector2(_hash01(key, i) - 0.5,
+							_hash01(key, i + 23) - 0.5) * cell * 0.82
+					draw_circle(grain, 1.5, edge.darkened(0.2))
+				for i in 2:
+					draw_circle(at + Vector2(_hash01(key, i + 3) - 0.5,
+							_hash01(key, i + 9) - 0.5) * cell * 0.6, 1.8,
+							Color(1.0, 0.45, 0.2, 0.35))
+			"pontoon":
+				# Floating sections, bolted at the joins.
+				var span := Vector2(cell * 0.86, cell * 0.5) if horizontal \
+						else Vector2(cell * 0.5, cell * 0.86)
+				var deck := Rect2(at - span * 0.5, span)
+				draw_rect(deck, fill.lightened(0.05))
+				draw_rect(deck, edge, false, 1.5)
+				for corner: Vector2 in [deck.position, deck.end,
+						deck.position + Vector2(span.x, 0.0),
+						deck.position + Vector2(0.0, span.y)]:
+					draw_circle(corner, 1.4, Color(0.75, 0.78, 0.82, 0.5))
 			"ice":
 				draw_rect(Rect2(at - Vector2(cell, cell) * 0.32, Vector2(cell, cell) * 0.64),
 						Color(0.85, 0.93, 1.0, 0.10))
@@ -381,6 +480,66 @@ func _draw_prop(kind: String, at: Vector2, cell: float, roll: float, pal: Dictio
 			for corner: Vector2 in [r.position, r.position + Vector2(r.size.x, 0.0),
 					r.position + Vector2(0.0, r.size.y), r.end]:
 				draw_circle(corner, 1.1, Color(0.7, 0.72, 0.78, 0.5))
+		"blossom":
+			for i in 5:
+				var petal := at + Vector2.RIGHT.rotated(TAU * float(i) / 5.0 + roll) \
+						* scale * 0.8
+				draw_circle(petal, scale * 0.42, Color(0.95, 0.7, 0.8, 0.55))
+			draw_circle(at, scale * 0.32, Color(1.0, 0.9, 0.6, 0.6))
+		"hedges":
+			var box := Rect2(at - Vector2(scale * 1.3, scale * 0.7),
+					Vector2(scale * 2.6, scale * 1.4))
+			draw_rect(box, Color(0.18, 0.32, 0.16, 0.6))
+			draw_rect(box, Color(0.28, 0.45, 0.22, 0.5), false, 1.0)
+		"lilies":
+			draw_circle(at, scale * 0.9, Color(0.22, 0.42, 0.28, 0.55))
+			draw_arc(at, scale * 0.9, 0.6 + roll, 5.4 + roll, 10,
+					Color(0.35, 0.6, 0.4, 0.5), 1.0, true)
+			draw_circle(at + Vector2(scale * 0.3, -scale * 0.3), scale * 0.22,
+					Color(0.95, 0.85, 0.9, 0.6))
+		"nets":
+			var frame := Rect2(at - Vector2(scale, scale), Vector2(scale, scale) * 2.0)
+			draw_rect(frame, Color(0.35, 0.3, 0.22, 0.35), false, 1.0)
+			for i in 3:
+				var t := (float(i) + 0.5) / 3.0
+				draw_line(frame.position + Vector2(frame.size.x * t, 0.0),
+						frame.position + Vector2(frame.size.x * t, frame.size.y),
+						Color(0.6, 0.58, 0.5, 0.3), 1.0)
+				draw_line(frame.position + Vector2(0.0, frame.size.y * t),
+						frame.position + Vector2(frame.size.x, frame.size.y * t),
+						Color(0.6, 0.58, 0.5, 0.3), 1.0)
+		"rubble":
+			for i in 3:
+				var chunk := at + Vector2(_hash01(Vector2i(int(at.x), int(at.y)), i) - 0.5,
+						roll - 0.5) * scale * 1.6
+				var pts := PackedVector2Array([
+					chunk + Vector2(-scale * 0.5, scale * 0.4),
+					chunk + Vector2(0.0, -scale * 0.55),
+					chunk + Vector2(scale * 0.55, scale * 0.4)])
+				draw_colored_polygon(pts, Color(pal["rock"]).darkened(0.05 + 0.05 * float(i)))
+		"glass":
+			for i in 3:
+				var shard := at + Vector2.RIGHT.rotated(TAU * float(i) / 3.0 + roll) * scale
+				draw_line(at, shard, Color(0.8, 0.9, 0.95, 0.35), 1.5, true)
+			draw_circle(at, scale * 0.22, Color(0.9, 0.97, 1.0, 0.4))
+		"hummocks":
+			draw_arc(at, scale * 1.1, PI, TAU, 12, Color(0.85, 0.92, 1.0, 0.35), 2.0, true)
+			draw_arc(at + Vector2(scale * 0.6, scale * 0.2), scale * 0.7, PI, TAU, 10,
+					Color(0.8, 0.88, 0.98, 0.28), 1.5, true)
+		"drifts":
+			var pts := PackedVector2Array([
+				at + Vector2(-scale * 1.6, scale * 0.5),
+				at + Vector2(-scale * 0.4, -scale * 0.5),
+				at + Vector2(scale * 1.0, -scale * 0.1),
+				at + Vector2(scale * 1.6, scale * 0.5)])
+			draw_polyline(pts, Color(1, 1, 1, 0.22), 2.0, true)
+		"slag":
+			draw_circle(at, scale * 0.9, Color(0.2, 0.18, 0.17, 0.6))
+			draw_circle(at + Vector2(scale * 0.2, -scale * 0.15), scale * 0.35,
+					Color(1.0, 0.42, 0.15, 0.45))
+		"bollards":
+			draw_circle(at, scale * 0.55, Color(0.3, 0.32, 0.36, 0.65))
+			draw_arc(at, scale * 0.85, 0.0, TAU, 12, Color(0.62, 0.55, 0.4, 0.4), 1.5, true)
 		_:
 			draw_circle(at, scale * 0.5, Color(pal["rock"]).darkened(0.1))
 

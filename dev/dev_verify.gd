@@ -632,14 +632,18 @@ func _check_road_ladder() -> void:
 	check("harder tiers have fewer firing positions", ok_spots)
 	check("every tier has at least three single-road maps",
 			by_tier.size() == TDData.TIERS.size() and by_tier[0]["path"].size() >= 3)
-	check("every area holds four maps", _areas_are_full())
+	check("every area holds %d maps" % MAPS_PER_AREA, _areas_are_full())
 	check("every lane of a multi-lane map is defensible (%s)" % bad_lane, ok_lanes)
 	check("multi-lane maps exist", lanes_report.size() >= 3)
 
 
+## Every area holds the same number of maps, so no area is a stub.
+const MAPS_PER_AREA := 6
+
+
 func _areas_are_full() -> bool:
 	for area: Dictionary in TDData.AREAS:
-		if TDData.levels_in_area(str(area["id"])).size() != 4:
+		if TDData.levels_in_area(str(area["id"])).size() != MAPS_PER_AREA:
 			return false
 	return true
 
@@ -3241,7 +3245,8 @@ func _check_levels() -> void:
 	check("all paths enter and exit off-grid", ok_ends)
 	check("every level has water", ok_water)
 	check("every level has a real route", ok_len)
-	check("twenty levels exist", TDData.LEVELS.size() == 20)
+	check("every area contributes its maps (%d)" % TDData.LEVELS.size(),
+			TDData.LEVELS.size() == TDData.AREAS.size() * MAPS_PER_AREA)
 
 	# Themes must be distinct so no two maps look alike.
 	var themes: Array = []
@@ -3267,7 +3272,9 @@ func _check_levels() -> void:
 	# Render styles: known values only, and no two maps share a road surface.
 	var known_path: Array = ["dirt", "gravel", "mud", "stone", "slabs", "brick",
 			"boardwalk", "planks", "rail", "ice", "ember", "sand", "cobble", "grit",
-			"basalt", "flagstone", "duckboard", "clinker", "crystal", "conduit"]
+			"basalt", "flagstone", "duckboard", "clinker", "crystal", "conduit",
+			"towpath", "chalk", "causeway", "reedmat", "haulroad", "saltcrust",
+			"snowpack", "glaze", "cinder", "pontoon"]
 	var known_ground: Array = ["checker", "stripes", "dots", "tiles", "flat", "dunes"]
 	var known_water: Array = ["calm", "floes", "murk", "surf"]
 	var ok_styles := true
