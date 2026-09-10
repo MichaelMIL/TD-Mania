@@ -68,6 +68,15 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
       `Progress.stars` (union across attempts, nothing for a cheated run),
       and they show on the level cards, in the account bar, on the in-match
       info panel and on the defeat card.
+- [x] **Data-driven waves.** *Implemented 2026-09-10.* `_build_wave()` is a
+      loop over `TDData.WAVE_RULES` / `BOSS_WAVE` — one rule per creep kind
+      with `from`, `every`/`offset`, group size, spacing and lead-in.
+      `AREA_WAVES` layers per-area flavour on top (`tweak` a kind, `add` a
+      group, `drop` one), so the Wastes send early ashwalkers in packs, the
+      Riverlands run fast and light, the Frozen Coast leans on armour and
+      menders, and the Delta throws more of everything sooner. The base
+      curve is byte-identical to the old hardcoded builder, pinned by golden
+      compositions in the suite, and `dev/dev_waves.tscn` prints the curve.
 - [x] **Tech respec.** *Implemented 2026-09-10.* A **Respec** button on the
       tech screen quotes what it will pay — 80% of everything spent, at the
       prices actually paid, doctrine and tower ranks together — and a second
