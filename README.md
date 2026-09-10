@@ -461,6 +461,18 @@ Flamethrower) cannot, and neither can their splash — a shell that lands under
 a Drake does nothing to it. The palette says "ground only" for those, so an
 air wave forces a mixed defence rather than more of the same tower.
 
+### Bosses
+
+The two heavies do something rather than only being large. Every nine
+seconds the **Behemoth** bellows and drags its escort forward — everything
+near it runs 40% faster for three seconds, so it arrives inside a crowd
+rather than behind one. Every eight seconds the **Titan** slams the ground
+and stuns every tower within its reach for a second and a half, buying
+itself a corridor through whatever was covering the road.
+
+Both are driven from `game.gd`, since the ability needs to see the rest of
+the board, and both announce themselves on the map.
+
 ### Wave affixes
 
 From wave 7, every third wave carries a modifier — the same creeps, but one

@@ -1808,11 +1808,14 @@ static var ENEMIES: Dictionary = {
 		"name": "Titan", "hp": 2600.0, "speed": 34.0, "reward": 420,
 		"damage": 8, "radius": 30.0, "armor": 16.0, "color": Color("6a1b9a"),
 		"split_into": "warden", "split_count": 2,
-		"note": "Late-game boss. Breaks into Wardens when it falls.",
+		"ability": "quake", "ability_period": 8.0, "ability_radius": 165.0,
+		"note": "Breaks into Wardens when it falls, and stuns nearby towers as it comes.",
 	},
 	"boss": {
 		"name": "Behemoth", "hp": 1600.0, "speed": 40.0, "reward": 280,
 		"damage": 6, "radius": 25.0, "armor": 9.0, "color": Color("e53935"),
+		"ability": "rally", "ability_period": 9.0, "ability_radius": 190.0,
+		"note": "Bellows every few seconds and drags its escort forward with it.",
 	},
 }
 

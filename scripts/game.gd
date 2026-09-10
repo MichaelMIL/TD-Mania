@@ -602,6 +602,7 @@ func _process(delta: float) -> void:
 	if game_over:
 		return
 	_process_menders(delta)
+	_process_abilities(delta)
 	if in_wave:
 		wave_time += delta
 		while spawn_index < spawn_queue.size() \
@@ -626,6 +627,50 @@ func _process(delta: float) -> void:
 	# Creeps walk out from under a still cursor, so the card is re-checked
 	# every frame rather than only on mouse movement.
 	hud.refresh_creep_tip()
+
+
+## Bosses do something on a timer. Both abilities need to see the rest of
+## the board, which the creep itself cannot, so they are driven from here.
+func _process_abilities(delta: float) -> void:
+	for boss: Enemy in enemies:
+		if not is_instance_valid(boss) or boss.dead or boss.ability == "":
+			continue
+		boss.ability_clock -= delta
+		if boss.ability_clock > 0.0:
+			continue
+		boss.ability_clock = boss.ability_period
+		match boss.ability:
+			"rally":
+				# Drags the escort along with it, so the boss arrives inside
+				# a crowd rather than behind one.
+				var moved := 0
+				for other: Enemy in enemies_near(boss.position, boss.ability_radius):
+					if other == boss:
+						continue
+					if boss.position.distance_to(other.position) > boss.ability_radius:
+						continue
+					other.hasten(1.4, 3.0)
+					moved += 1
+				if moved > 0:
+					fx_ring(boss.position, boss.ability_radius, Color("ff8a65"))
+					fx_text(boss.position + Vector2(0.0, -40.0),
+							"Rally! %d hurried" % moved, Color("ff8a65"), 16)
+					Audio.play("boss", -8.0, 0.0)
+			"quake":
+				# Buys itself a corridor by silencing what covers it.
+				var hushed := 0
+				for t: Tower in occupied.values():
+					if not is_instance_valid(t):
+						continue
+					if boss.position.distance_to(t.position) > boss.ability_radius:
+						continue
+					t.stun(1.6)
+					hushed += 1
+				fx_ring(boss.position, boss.ability_radius, Color("ffd54f"))
+				if hushed > 0:
+					fx_text(boss.position + Vector2(0.0, -44.0),
+							"Quake! %d towers stunned" % hushed, Color("ffd54f"), 16)
+					Audio.play("explosion", -6.0, 0.0)
 
 
 ## Menders top up wounded neighbours, which is what makes burst damage and

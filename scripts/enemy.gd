@@ -40,6 +40,16 @@ var flying: bool = false
 ## Hits absorbed outright before damage starts landing. Wave affixes hand
 ## these out; a volley strips them cheaply, one big shot wastes itself.
 var shield_hits: int = 0
+## Bosses do something rather than only being large: "rally" hurries the
+## escort along, "quake" stuns the towers near it. Driven by the game, which
+## is the only thing that can see the rest of the board.
+var ability: String = ""
+var ability_period: float = 0.0
+var ability_radius: float = 0.0
+var ability_clock: float = 0.0
+## A rallied creep runs faster for a while.
+var haste_timer: float = 0.0
+var haste_factor: float = 1.0
 var slow_immune: bool = false
 var burn_immune: bool = false
 var heal: float = 0.0
@@ -93,6 +103,11 @@ func setup(k: String, hp_mult: float, speed_mult: float, points: PackedVector2Ar
 	charge_time = float(d.get("charge_time", 0.0))
 	charge_mult = float(d.get("charge_mult", 1.0))
 	charge_clock = randf() * maxf(0.1, charge_period)
+	ability = str(d.get("ability", ""))
+	ability_period = float(d.get("ability_period", 0.0))
+	ability_radius = float(d.get("ability_radius", 0.0))
+	# Half a period in, so a boss does something before it is halfway home.
+	ability_clock = ability_period * 0.5
 	flying = bool(d.get("flying", false))
 	if flying:
 		# Flyers ignore the road entirely: spawn point straight to the base.
@@ -120,6 +135,11 @@ func _process(delta: float) -> void:
 		queue_redraw()
 	if push_fatigue > 0.0:
 		push_fatigue = maxf(0.0, push_fatigue - delta * PUSH_FATIGUE_DECAY)
+	if haste_timer > 0.0:
+		haste_timer -= delta
+		if haste_timer <= 0.0:
+			haste_factor = 1.0
+			queue_redraw()
 	if burn_timer > 0.0:
 		burn_timer -= delta
 		# The tower that lit the fire may have been sold since. A freed object
@@ -209,7 +229,17 @@ func _sync_position() -> void:
 
 
 func speed() -> float:
-	return base_speed * slow_factor * (charge_mult if charging > 0.0 else 1.0)
+	return base_speed * slow_factor * haste_factor \
+			* (charge_mult if charging > 0.0 else 1.0)
+
+
+## Hurried along by a boss's rally.
+func hasten(factor: float, duration: float) -> void:
+	if dead:
+		return
+	haste_factor = maxf(haste_factor, factor)
+	haste_timer = maxf(haste_timer, duration)
+	queue_redraw()
 
 
 ## Returns true when this hit was the killing blow. `source` is the tower that

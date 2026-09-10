@@ -413,7 +413,25 @@ func _redraw_idle(delta: float) -> void:
 		queue_redraw()
 
 
+## Knocked out of action by a Titan's quake. A stunned tower holds its fire
+## and says so, which is the point: the boss is buying itself a corridor.
+var stun_timer: float = 0.0
+
+
+func stun(duration: float) -> void:
+	stun_timer = maxf(stun_timer, duration)
+	queue_redraw()
+
+
 func _process(delta: float) -> void:
+	if stun_timer > 0.0:
+		stun_timer -= delta
+		if stun_timer <= 0.0:
+			queue_redraw()
+		else:
+			# Nothing fires, nothing charges, nothing launches.
+			_redraw_idle(delta)
+			return
 	buff_timer -= delta
 	if buff_timer <= 0.0:
 		buff_timer = 0.4
@@ -630,6 +648,11 @@ func _shoot(delay: float) -> void:
 func _draw() -> void:
 	var col: Color = def()["color"]
 	var rng := stat("range")
+	if stun_timer > 0.0:
+		draw_arc(Vector2.ZERO, 26.0, 0.0, TAU, 20, Color(1.0, 0.85, 0.3, 0.7), 2.0, true)
+		for i in 3:
+			var spark := Vector2.RIGHT.rotated(TAU * float(i) / 3.0 + stun_timer * 6.0) * 20.0
+			draw_line(spark * 0.6, spark, Color(1.0, 0.9, 0.4, 0.8), 2.0, true)
 
 	if show_range:
 		draw_circle(Vector2.ZERO, rng, Color(col.r, col.g, col.b, 0.08))

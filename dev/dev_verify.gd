@@ -211,6 +211,7 @@ func _ready() -> void:
 	_check_save_versioning()
 	_check_wave_rules()
 	_check_wave_affixes()
+	_check_boss_abilities()
 	_check_flyers()
 	_check_board_tooltips()
 	_check_objectives()
@@ -2285,6 +2286,90 @@ func _road_length(points: PackedVector2Array) -> float:
 	return total
 
 
+
+
+
+
+## Bosses do something rather than only being large.
+func _check_boss_abilities() -> void:
+	var with_ability: Array = []
+	for kind: String in TDData.ENEMIES:
+		if str(TDData.ENEMIES[kind].get("ability", "")) != "":
+			with_ability.append(kind)
+	check("the heavies have abilities (%s)" % ", ".join(with_ability),
+			with_ability.has("boss") and with_ability.has("titan"))
+	var explained := true
+	for kind: String in with_ability:
+		if not str(TDData.ENEMIES[kind].get("note", "")).length() > 20:
+			explained = false
+	check("and their cards say what they do", explained)
+
+	var saved: Array = game.enemies.duplicate()
+	game.enemies.clear()
+	game.invalidate_targeting_grid()
+
+	# Rally hurries the escort along.
+	var behemoth := Enemy.new()
+	behemoth.setup("boss", 1.0, 1.0, game.routes[0])
+	behemoth.position = Vector2(400.0, 400.0)
+	var escort := Enemy.new()
+	escort.setup("grunt", 1.0, 1.0, game.routes[0])
+	escort.position = behemoth.position + Vector2(60.0, 0.0)
+	for e in [behemoth, escort]:
+		add_child(e)
+		game.enemies.append(e)
+	game.invalidate_targeting_grid()
+	var walk_speed := escort.speed()
+	behemoth.ability_clock = 0.0
+	game._process_abilities(0.1)
+	check("a rally hurries the escort", escort.speed() > walk_speed * 1.2)
+	check("and wears off", escort.haste_timer > 0.0)
+	for i in 40:
+		escort._process(0.1)
+	check("leaving them at their own pace",
+			is_equal_approx(escort.speed(), walk_speed))
+	check("the boss puts its ability back on the clock",
+			behemoth.ability_clock > 0.0)
+
+	# Quake silences the towers covering it.
+	var titan := Enemy.new()
+	titan.setup("titan", 1.0, 1.0, game.routes[0])
+	var near := Vector2i(-99, -99)
+	for key: Vector2i in game.terrain:
+		if game.can_place(key, "gun"):
+			near = key
+			break
+	game.placing = "gun"
+	game.gold = 999
+	game._try_place(near)
+	game.placing = ""
+	var covered: Tower = game.occupied[near]
+	titan.position = covered.position
+	add_child(titan)
+	game.enemies.append(titan)
+	game.invalidate_targeting_grid()
+	titan.ability_clock = 0.0
+	game._process_abilities(0.1)
+	check("a quake stuns the towers on top of it", covered.stun_timer > 0.0)
+	var far := Tower.new()
+	far.game = game
+	far.setup("gun", Vector2i.ZERO)
+	far.position = titan.position + Vector2(900.0, 0.0)
+	check("and leaves the rest alone", far.stun_timer == 0.0)
+	# A stunned tower holds its fire.
+	covered.target = null
+	covered._process(0.05)
+	check("a stunned tower does not fire", covered.target == null)
+	covered.stun_timer = 0.0
+	far.free()
+
+	game.occupied.erase(near)
+	covered.queue_free()
+	for e in [behemoth, escort, titan]:
+		game.enemies.erase(e)
+		e.queue_free()
+	game.enemies.assign(saved)
+	game.invalidate_targeting_grid()
 
 
 ## Wave affixes: the same creeps, but one thing about all of them is
