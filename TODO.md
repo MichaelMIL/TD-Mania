@@ -34,67 +34,53 @@ harnesses.
 
 ## Depth
 
-- [ ] **Bosses that do something.** The Behemoth and the Titan are just
-      large: same walk, same nothing. Give each a behaviour — a shield that
-      has to be broken before damage lands, a shockwave that stuns towers
-      for a second, a call that drags its escort forward. Touches
-      `enemy.gd` and the boss branch of `_build_wave()`.
-- [ ] **Wave affixes.** Now that waves come from a table, an occasional
-      modifier costs almost nothing and changes a lot: *armoured* (+50%
-      armour), *swift* (+25% speed, −20% health), *shielded* (first hit
-      absorbed). Announce it in the wave readout, which already has room.
-      `TDData.WAVE_RULES` plus a few lines in `_build_wave()`.
-- [ ] **Map hazards.** A per-map `hazard` entry that bends one rule: wind
-      that pushes aircraft off course, ash that halves burn damage, fog
-      that trims tower range, a tide that floods two cells every fifth
-      wave. One field in `LEVELS`, read in `tower.gd` and `game.gd`. It
-      would make thirty maps feel like thirty decisions rather than thirty
-      shapes.
-- [ ] **Chosen modifiers, for a reward.** The objectives already know how
-      to judge "no water towers" and "a tower budget". Offer them as opt-in
-      modifiers at the start of a run for an XP and coin multiplier.
-      Nearly free given `objective_mask()`, and it gives a cleared map a
-      reason to be played again.
-- [ ] **Endless is not scored.** Past a map's clear wave the run continues
-      but nothing records how far it went. Track the best endless wave per
-      map separately from the clear and show it on the level card as a
-      second line.
+- [x] **Bosses that do something.** *Implemented 2026-09-11.* The Behemoth
+rallies every nine seconds (everything near it runs 40% faster for three);
+the Titan quakes every eight, stunning towers within reach for 1.6 s. Driven
+from `game.gd`, announced on the board, and described in their bestiary
+      notes.
 
+- [x] **Wave affixes.** *Implemented 2026-09-11.* From wave 7, every third
+wave carries Armoured, Swift, Shielded or Hardy; boss waves are left alone.
+Shields are a hit counter on the creep, drawn as a ring. The readout names
+the affix and says how to answer it.
+- [x] **Map hazards.** *Implemented 2026-09-11.* Eight maps run under Fog,
+Ashfall, Gale or Brine (`TDData.HAZARDS`, `game.hazard_mult()`), named and
+explained on the level card and the info panel.
+- [x] **Chosen modifiers, for a reward.** *Implemented 2026-09-11.* Dry
+feet, Skeleton crew, No refunds and Thin line sit under every unlocked level
+card, stack, and multiply the payout. Enforced by the match rather than
+judged afterwards.
+- [x] **Endless is not scored.** *Implemented 2026-09-11.*
+`Progress.endless_best()` reports the waves past the finish line, shown on
+the level card and the defeat card.
 ## Polish
 
-- [ ] **Colour is doing too much work.** Routes, tiers, tower types and
-      creep kinds are all told apart by hue, and roughly one man in twelve
-      cannot separate some of those pairs. Shapes on route markers, a
-      pattern on the tier pill, and a colourblind-safe palette in Options.
-      The wave chips already carry silhouettes, so there is a pattern to
-      copy.
-- [ ] **Moving a tower.** Misplace a Command Post and the only remedy is
-      selling it at 70%. Allow picking a tower up during the build phase
-      and re-placing it free, once per wave. `game.gd` placement, plus a
-      state on the cursor.
-- [ ] **The palette does not say enough.** Hovering a card shows text but
-      not the thing that decides the purchase: where it can shoot. Draw its
-      range ring over the board on hover, before you commit to placing it —
-      `cursor.gd` already draws exactly that for a held tower.
-- [ ] **Per-area music.** One ambient pad plays everywhere. `audio.gd`
-      synthesises its own sound, so an area-flavoured variant is a
-      parameter change rather than new content: colder intervals for the
-      Frozen Coast, a lower drone for the Delta.
-
+- [x] **Colour is doing too much work.** *Implemented 2026-09-11.* Lane
+shapes and tier marks are always on, the build cursor draws a tick or a
+cross, and Options carries a colour-blind palette chosen by simulating
+protanopia and deuteranopia — a simulation the suite runs as a test.
+- [x] **Moving a tower.** *Implemented 2026-09-11.* Move lifts a tower
+between waves, keeping its ranks and kills; anywhere it could have been
+built is fair, once per wave, free.
+- [x] **The palette does not say enough.** *Implemented 2026-09-11.*
+Hovering a card draws the tower's range and dead zone at the last hovered
+cell and tints every cell it could stand on.
+- [x] **Per-area music.** *Implemented 2026-09-11.* `Audio.AREA_MUSIC` tunes
+the same loop per area; a match plays its area's pad, the menus play the
+plain one.
 ## Robustness
 
 - [ ] **Split `dev/dev_verify.gd`.** Past 3,400 lines, and every new
       feature lands in the same file. One script per area of the game
       (progress, combat, maps, UI) with a runner that loads them would make
       a failure easier to place and the file easier to add to.
-- [ ] **Saves have no safety net.** A crash mid-write loses a slot
-      outright. Write to a temporary file and rename, keep one previous
-      copy, and refuse to load a file that does not parse rather than
-      starting an account from a corrupt one. `progress.gd`.
-- [ ] **Runs are not reproducible.** The balance report seeds every run,
-      but a real run does not record its seed, so "look what happened"
-      cannot be replayed. Store the seed in the run state and reuse it on
-      resume.
+- [x] **Saves have no safety net.** *Implemented 2026-09-11.* Writes land by
+rename with the previous copy kept as `.bak`; reads fall back to it and
+refuse a file that is not a save.
+- [x] **Runs are not reproducible.** *Implemented 2026-09-11.* A run draws
+one seed, carries it in the parked state with its handicaps, and shows it in
+the pause menu.
 - [x] **Creeps are allocated and freed every wave.** *Measured 2026-09-11,
       and left alone.* `dev/dev_perf.tscn -- --churn` creates, sets up and
       frees 200 creeps: 0.95 ms to make them, 0.27 ms to free them. A heavy
