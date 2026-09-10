@@ -216,6 +216,7 @@ func _ready() -> void:
 	_check_area_music()
 	_check_colour_access()
 	_check_run_seed()
+	_check_save_safety()
 	_check_modifiers()
 	_check_flyers()
 	_check_board_tooltips()
@@ -2384,6 +2385,57 @@ func _check_modifiers() -> void:
 
 
 
+
+
+
+
+## Saves survive being interrupted: a write lands whole or not at all, and
+## the copy it replaced is kept.
+func _check_save_safety() -> void:
+	var path := "user://td_mania_safety_test.cfg"
+	var dir := DirAccess.open("user://")
+	for leftover: String in [path, path + ".bak", path + ".tmp"]:
+		if FileAccess.file_exists(leftover):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(leftover))
+
+	var first := ConfigFile.new()
+	first.set_value("meta", "version", Progress.SAVE_VERSION)
+	first.set_value("progress", "xp", 111)
+	check("a save writes", Progress.write_config(first, path))
+	check("and lands where it was asked to", FileAccess.file_exists(path))
+	check("leaving no temporary file behind", not FileAccess.file_exists(path + ".tmp"))
+
+	var second := ConfigFile.new()
+	second.set_value("meta", "version", Progress.SAVE_VERSION)
+	second.set_value("progress", "xp", 222)
+	Progress.write_config(second, path)
+	check("the second write keeps the first as a backup",
+			FileAccess.file_exists(path + ".bak"))
+	var read_back: ConfigFile = Progress.read_config(path)
+	check("and reading gets the newer one",
+			int(read_back.get_value("progress", "xp", 0)) == 222)
+
+	# A file that cannot be parsed must not be preferred over the backup.
+	var broken := FileAccess.open(path, FileAccess.WRITE)
+	broken.store_string("[progress\nxp = ")
+	broken.close()
+	var rescued: ConfigFile = Progress.read_config(path)
+	check("a corrupt save falls back to the backup", rescued != null
+			and int(rescued.get_value("progress", "xp", 0)) == 111)
+
+	# A file that parses but is not one of ours is not a save either.
+	var stranger := ConfigFile.new()
+	stranger.set_value("something", "else", 1)
+	check("a foreign file is not mistaken for a save",
+			not Progress.looks_like_save(stranger))
+	stranger.save(path)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path + ".bak"))
+	check("and with no backup to fall back on, nothing is loaded",
+			Progress.read_config(path) == null)
+
+	for leftover: String in [path, path + ".bak", path + ".tmp"]:
+		if FileAccess.file_exists(leftover):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(leftover))
 
 
 ## A run's randomness comes from one number, and that number travels with

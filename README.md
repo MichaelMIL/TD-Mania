@@ -63,6 +63,18 @@ the prices it actually paid — and on a second press clears every doctrine and
 tower rank and banks the coins. Buying the same ranks back costs what it did
 the first time, so a respec is a haircut, not a loophole.
 
+### Save safety
+
+A save used to be written by overwriting the only copy of it, so a crash,
+a full disk or a pulled plug part-way through left nothing to load. Writes
+now go to a temporary neighbour first and land by rename, and the copy
+they replace is kept as `.bak`.
+
+Loading prefers the real file, falls back to the backup when it will not
+parse — or parses but is plainly not a save — and returns nothing at all
+when neither is usable, so a corrupt file starts no account rather than
+starting an empty one over the top of a real one.
+
 ### Save format
 
 Each slot is a `ConfigFile` at `user://td_mania_slot_N.cfg` stamped with

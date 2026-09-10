@@ -154,6 +154,54 @@ static var slot_too_new: bool = false
 
 ## What version a file claims, inferring one for saves written before the
 ## field existed.
+# ------------------------------------------------------------ file safety
+#
+# A save is written by overwriting the only copy of it. A crash, a full
+# disk or a pull of the power part-way through that leaves nothing to load
+# and an account gone. Writes now go to a temporary file first and land by
+# rename, and the copy they replace is kept.
+
+## Whether a parsed file actually looks like one of our saves, as opposed
+## to an empty or truncated file that happens to parse.
+static func looks_like_save(cfg: ConfigFile) -> bool:
+	return cfg.has_section("meta") or cfg.has_section("progress")
+
+
+## Writes a config without ever leaving the real file half-written: out to
+## a temporary neighbour, the current file kept as a backup, then the
+## temporary one renamed over the top.
+static func write_config(cfg: ConfigFile, path: String) -> bool:
+	var temp := path + ".tmp"
+	if cfg.save(temp) != OK:
+		return false
+	var dir := DirAccess.open(path.get_base_dir())
+	if dir == null:
+		return false
+	if dir.file_exists(path.get_file()):
+		# Keep the copy we are about to replace.
+		dir.remove(path.get_file() + ".bak")
+		dir.rename(path.get_file(), path.get_file() + ".bak")
+	return dir.rename(temp.get_file(), path.get_file()) == OK
+
+
+## Reads a config, falling back to the backup when the real file is gone
+## or unreadable. Returns null when there is nothing usable, so a corrupt
+## file starts nothing rather than starting an empty account over the top
+## of a real one.
+static func read_config(path: String) -> ConfigFile:
+	for candidate: String in [path, path + ".bak"]:
+		var cfg := ConfigFile.new()
+		if cfg.load(candidate) != OK:
+			continue
+		if not looks_like_save(cfg):
+			continue
+		if candidate != path:
+			push_warning("Save %s was unreadable; the backup was used instead."
+					% path.get_file())
+		return cfg
+	return null
+
+
 static func detect_version(cfg: ConfigFile) -> int:
 	var stamped := int(cfg.get_value("meta", "version", 0))
 	if stamped > 0:
@@ -215,8 +263,8 @@ static func load_state() -> void:
 		return
 	loaded = true
 	slot_too_new = false
-	var cfg := ConfigFile.new()
-	if cfg.load(slot_path(slot)) != OK:
+	var cfg := read_config(slot_path(slot))
+	if cfg == null:
 		return
 	var found := detect_version(cfg)
 	if found > SAVE_VERSION:
@@ -304,7 +352,7 @@ static func save_state() -> void:
 	cfg.set_value("options", "colourblind", colourblind())
 	for key: String in runs:
 		cfg.set_value("runs", key, runs[key])
-	cfg.save(slot_path(slot))
+	write_config(cfg, slot_path(slot))
 
 
 # ------------------------------------------------------------- key binds
