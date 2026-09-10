@@ -33,11 +33,24 @@ static var TARGET_HINTS: Array = [
 ## scene change without an autoload.
 static var selected_level: int = 0
 
-## Tuned tower definitions, rebuilt whenever the overrides or the level
-## change. Towers read their numbers every frame, so this is cached rather
-## than merged on each lookup.
+## Tuned definitions, rebuilt whenever the overrides or the level change.
+## Towers read their numbers every frame, so these are cached rather than
+## merged on each lookup.
 static var _tuned_defs: Dictionary = {}
+static var _tuned_enemies: Dictionary = {}
+static var _tuned_tracks: Dictionary = {}
 static var _tuned_stamp: String = ""
+
+
+## Drops every tuned cache when the overrides or the level move under them.
+static func _tuning_ready() -> void:
+	var stamp := "%d/%d" % [Tuning.version, selected_level]
+	if stamp == _tuned_stamp:
+		return
+	_tuned_stamp = stamp
+	_tuned_defs = {}
+	_tuned_enemies = {}
+	_tuned_tracks = {}
 ## Set by the menu when the player picks Continue rather than a fresh run.
 static var resume_run: bool = false
 
@@ -919,22 +932,64 @@ static var LEVELS: Array = [
 ## here rather than indexing TOWERS directly, or the tuning panel (F2) will
 ## not reach it.
 static func tower_def(id: String) -> Dictionary:
-	var stamp := "%d/%d" % [Tuning.version, selected_level]
-	if stamp != _tuned_stamp:
-		_tuned_stamp = stamp
-		_tuned_defs = {}
+	_tuning_ready()
 	if _tuned_defs.has(id):
 		return _tuned_defs[id]
-	var base: Dictionary = TOWERS[id]
-	var over := Tuning.effective(id, selected_level)
-	var out: Dictionary = base
-	if not over.is_empty():
-		out = base.duplicate(true)
+	_tuned_defs[id] = _apply_numbers(TOWERS[id], Tuning.effective(id, selected_level))
+	return _tuned_defs[id]
+
+
+## A creep's numbers with any tuning overrides applied. Same layering as
+## towers: global first, then this level's.
+static func enemy_def(kind: String) -> Dictionary:
+	_tuning_ready()
+	if _tuned_enemies.has(kind):
+		return _tuned_enemies[kind]
+	_tuned_enemies[kind] = _apply_numbers(ENEMIES[kind],
+			Tuning.effective(Tuning.enemy_subject(kind), selected_level))
+	return _tuned_enemies[kind]
+
+
+## A tower's upgrade tracks with any tuning applied — rank caps, coin cost
+## and the per-rank modifiers themselves. Everything that reads a track goes
+## through here, so `mods_for`, the costs and the capstones all follow.
+static func tracks(type_id: String) -> Array:
+	_tuning_ready()
+	if _tuned_tracks.has(type_id):
+		return _tuned_tracks[type_id]
+	var base: Array = TOWERS[type_id]["tracks"]
+	var out: Array = base
+	var tuned := false
+	for i in base.size():
+		var over := Tuning.effective(Tuning.track_subject(type_id, i), selected_level)
+		if over.is_empty():
+			continue
+		if not tuned:
+			out = base.duplicate(true)
+			tuned = true
+		var track: Dictionary = out[i]
 		for key: String in over:
-			# Ints in the table stay ints, or costs turn into "$115.0".
-			out[key] = int(round(float(over[key]))) if typeof(base.get(key)) == TYPE_INT \
-					else float(over[key])
-	_tuned_defs[id] = out
+			if key.begins_with("mods."):
+				# A per-rank modifier, e.g. "mods.damage_mult".
+				var mod_key := key.substr(5)
+				(track["mods"] as Dictionary)[mod_key] = float(over[key])
+			elif typeof(track.get(key)) == TYPE_INT:
+				track[key] = int(round(float(over[key])))
+			else:
+				track[key] = float(over[key])
+	_tuned_tracks[type_id] = out
+	return out
+
+
+## Copies a table entry with the overridden numbers written over it, keeping
+## whole numbers whole so a cost never prints as "$115.0".
+static func _apply_numbers(base: Dictionary, over: Dictionary) -> Dictionary:
+	if over.is_empty():
+		return base
+	var out := base.duplicate(true)
+	for key: String in over:
+		out[key] = int(round(float(over[key]))) if typeof(base.get(key)) == TYPE_INT \
+				else float(over[key])
 	return out
 
 
@@ -1394,22 +1449,18 @@ static var TOWER_ORDER: Array = ["gun", "cannon", "frost", "tarpit", "tesla", "m
 		"flame", "shock", "mortar", "ballista", "laser", "mine", "tide", "torpedo",
 		"wavegun", "airfield", "helipad", "command"]
 
-static func tracks(type_id: String) -> Array:
-	return TOWERS[type_id]["tracks"]
-
-
 ## Coin cost of unlocking rank `rank + 1` of a track in the tech tree. Coins
 ## buy the *right* to install that rank; gold pays for it in each match.
 static func track_cost(type_id: String, track: int, rank: int) -> int:
 	var t: Dictionary = tracks(type_id)[track]
-	var base := float(TOWERS[type_id]["cost"]) * float(t["cost_frac"]) / 3.5
+	var base := float(tower_def(type_id)["cost"]) * float(t["cost_frac"]) / 3.5
 	return maxi(4, int(round(base * pow(1.6, float(rank)))))
 
 
 ## Gold cost of installing rank `rank + 1` on a tower during a match.
 static func track_gold_cost(type_id: String, track: int, rank: int) -> int:
 	var t: Dictionary = tracks(type_id)[track]
-	return int(float(TOWERS[type_id]["cost"]) * float(t["cost_frac"]) * 0.9
+	return int(float(tower_def(type_id)["cost"]) * float(t["cost_frac"]) * 0.9
 			* pow(1.4, float(rank)))
 
 

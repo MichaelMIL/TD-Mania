@@ -72,7 +72,8 @@ var _mods_stamp: int = -1
 
 
 func mods() -> Dictionary:
-	var stamp := ranks.hash()
+	# Tuning can rewrite what a rank does, so its version is part of the key.
+	var stamp := ranks.hash() ^ (Tuning.version << 8)
 	if stamp != _mods_stamp:
 		_mods_stamp = stamp
 		_mods_cache = TDData.mods_for(type_id, ranks)

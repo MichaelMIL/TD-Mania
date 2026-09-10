@@ -31,6 +31,10 @@ func _ready() -> void:
 		if args[i] == "--panel" and i + 1 < args.size():
 			if args[i + 1] == "tuning" and game.tuning_panel != null:
 				game.tuning_panel.toggle()
+				# "--mode upgrades|enemies" opens the panel on that tab.
+				for j in args.size():
+					if args[j] == "--mode" and j + 1 < args.size():
+						game.tuning_panel._select_mode(args[j + 1])
 			elif args[i + 1] == "cheats" and game.cheats != null:
 				game.cheats.toggle()
 	for i in args.size():

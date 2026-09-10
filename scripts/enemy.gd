@@ -69,7 +69,7 @@ func _init() -> void:
 
 func setup(k: String, hp_mult: float, speed_mult: float, points: PackedVector2Array) -> void:
 	kind = k
-	var d: Dictionary = TDData.ENEMIES[k]
+	var d: Dictionary = TDData.enemy_def(k)
 	display_name = str(d["name"])
 	max_hp = float(d["hp"]) * hp_mult
 	hp = max_hp

@@ -2177,7 +2177,7 @@ func _check_tuning() -> void:
 	Tuning.clear_value("gun", "damage", level)
 	check("clearing a level override falls back to the global", is_equal_approx(
 			float(TDData.tower_def("gun")["damage"]), base + 20.0))
-	Tuning.clear_tower("gun", -1)
+	Tuning.clear_subject("gun", -1)
 	check("clearing the tower falls back to the table", is_equal_approx(
 			float(TDData.tower_def("gun")["damage"]), base))
 
@@ -2215,6 +2215,92 @@ func _check_tuning() -> void:
 	check("knockback shows for the Wave Cannon and not the Gunner",
 			wave_keys.has("knockback") and not gun_keys.has("knockback"))
 
+	# ---- creeps -------------------------------------------------------
+	var grunt_hp: float = float(TDData.ENEMIES["grunt"]["hp"])
+	check("a stock creep reads the table",
+			is_equal_approx(float(TDData.enemy_def("grunt")["hp"]), grunt_hp))
+	Tuning.set_value(Tuning.enemy_subject("grunt"), "hp", grunt_hp * 3.0, -1)
+	check("a tuned creep reads the override",
+			is_equal_approx(float(TDData.enemy_def("grunt")["hp"]), grunt_hp * 3.0))
+	var beefy := Enemy.new()
+	beefy.setup("grunt", 1.0, 1.0, game.routes[0])
+	check("and a creep spawned now is actually tougher",
+			beefy.max_hp > grunt_hp * 2.5)
+	beefy.free()
+	Tuning.set_value(Tuning.enemy_subject("grunt"), "hp", grunt_hp * 0.5, level)
+	check("a level override beats the global one for creeps too",
+			is_equal_approx(float(TDData.enemy_def("grunt")["hp"]), grunt_hp * 0.5))
+	Tuning.clear_subject(Tuning.enemy_subject("grunt"), level)
+	Tuning.clear_subject(Tuning.enemy_subject("grunt"), -1)
+	check("and clearing puts the creep back",
+			is_equal_approx(float(TDData.enemy_def("grunt")["hp"]), grunt_hp))
+	var enemy_keys: Array = []
+	for row: Dictionary in Tuning.rows_for(Tuning.enemy_subject("mender")):
+		enemy_keys.append(str(row["key"]))
+	check("a creep exposes its own numbers", enemy_keys.has("hp")
+			and enemy_keys.has("speed") and enemy_keys.has("heal"))
+	check("and not ones it does not have",
+			not Tuning.rows_for(Tuning.enemy_subject("grunt")).any(
+					func(r): return str(r["key"]) == "heal"))
+
+	# ---- upgrade tracks -----------------------------------------------
+	var track_subject := Tuning.track_subject("gun", 0)
+	var stock_track: Dictionary = TDData.TOWERS["gun"]["tracks"][0]
+	var stock_max := int(stock_track["max"])
+	var stock_cost := TDData.track_cost("gun", 0, 0)
+	var mod_key := ""
+	for key: String in stock_track["mods"]:
+		if typeof((stock_track["mods"] as Dictionary)[key]) == TYPE_FLOAT:
+			mod_key = "mods." + key
+	check("a track exposes its ranks, its cost share and its modifier",
+			mod_key != "" and Tuning.rows_for(track_subject).size() >= 3)
+
+	Tuning.set_value(track_subject, "max", float(stock_max + 2), -1)
+	check("tuning the rank cap reaches the table",
+			int(TDData.tracks("gun")[0]["max"]) == stock_max + 2)
+	var capped := Tower.new()
+	capped.game = game
+	capped.setup("gun", Vector2i.ZERO)
+	check("and reaches a tower on the board",
+			capped.track_max(0) == stock_max + 2)
+	capped.free()
+
+	Tuning.set_value(track_subject, "cost_frac",
+			float(stock_track["cost_frac"]) * 2.0, -1)
+	check("tuning the cost share reprices the rank",
+			TDData.track_cost("gun", 0, 0) > stock_cost)
+
+	if mod_key != "":
+		var ranked := Tower.new()
+		ranked.game = game
+		ranked.setup("gun", Vector2i.ZERO)
+		ranked.ranks[0] = 1
+		var before_mod := ranked.stat("damage")
+		Tuning.set_value(track_subject, mod_key,
+				float(stock_track["mods"][mod_key.substr(5)]) * 1.5, -1)
+		check("tuning what a rank does changes an installed rank",
+				ranked.stat("damage") != before_mod)
+		ranked.free()
+
+	Tuning.clear_subject(track_subject, -1)
+	check("clearing a track puts every part of it back",
+			int(TDData.tracks("gun")[0]["max"]) == stock_max
+			and TDData.track_cost("gun", 0, 0) == stock_cost)
+
+	# Subjects must not collide: a tower, its track and a creep are separate.
+	Tuning.set_value("gun", "damage", 99.0, -1)
+	Tuning.set_value(Tuning.track_subject("gun", 0), "max", 7.0, -1)
+	Tuning.set_value(Tuning.enemy_subject("grunt"), "hp", 999.0, -1)
+	check("three kinds of subject are stored apart",
+			is_equal_approx(float(TDData.tower_def("gun")["damage"]), 99.0)
+			and int(TDData.tracks("gun")[0]["max"]) == 7
+			and is_equal_approx(float(TDData.enemy_def("grunt")["hp"]), 999.0))
+	Tuning.clear_all()
+	check("and reset clears all three",
+			is_equal_approx(float(TDData.tower_def("gun")["damage"]), base)
+			and int(TDData.tracks("gun")[0]["max"]) == stock_max
+			and is_equal_approx(float(TDData.enemy_def("grunt")["hp"]), grunt_hp))
+
 	# The panel itself: it must drive Tuning, not its own copy of the numbers.
 	var panel := TuningPanel.new()
 	panel.game = game
@@ -2228,6 +2314,28 @@ func _check_tuning() -> void:
 	panel._nudge("damage", -1.0)
 	check("with the scope flipped it writes the level layer",
 			Tuning.level_values.has(level))
+	# Back to the global layer; the scope was flipped a few lines above.
+	panel.scope_level = -1
+
+	# Every mode must list something and open on a real subject.
+	var empty_modes: Array = []
+	for panel_mode: String in ["towers", "upgrades", "enemies"]:
+		panel._select_mode(panel_mode)
+		if panel.subjects().is_empty() or panel.value_labels.is_empty():
+			empty_modes.append(panel_mode)
+	check("every mode lists subjects with numbers (%s)" % ",".join(empty_modes),
+			empty_modes.is_empty())
+	panel._select_mode("enemies")
+	panel._select_tower(Tuning.enemy_subject("tank"))
+	var tank_speed := Tuning.value_of(Tuning.enemy_subject("tank"), "speed", -1)
+	panel._nudge("speed", 1.0)
+	check("the panel can tune a creep",
+			Tuning.value_of(Tuning.enemy_subject("tank"), "speed", -1) > tank_speed)
+	panel._select_mode("upgrades")
+	panel._select_tower(Tuning.track_subject("cannon", 0))
+	panel._nudge("max", 1.0)
+	check("and an upgrade track",
+			Tuning.effective(Tuning.track_subject("cannon", 0), -1).has("max"))
 	panel._reset_all()
 	check("reset all clears both layers", not Tuning.has_overrides())
 	check("a harness never writes the tuning file", not Tuning.save_file())

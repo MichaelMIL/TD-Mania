@@ -1,9 +1,15 @@
 class_name TuningPanel
 extends Control
 
-## Live balance editor. F2 during a match opens it: pick a tower on the left,
-## nudge its numbers on the right, and watch the change take effect in the
-## running game — towers re-read their stats every frame.
+## Live balance editor. F2 during a match opens it: pick a subject on the
+## left, nudge its numbers on the right, and watch the change take effect in
+## the running game — towers and creeps re-read their numbers every frame.
+##
+## Three kinds of subject, chosen with the row of buttons at the top:
+## **Towers** (damage, rate, range, cost and the rest), **Upgrades** (each
+## tower's tracks: how many ranks, what a rank costs, and what a rank
+## actually does) and **Enemies** (health, speed, armour, bounty and the
+## traits that decide how a kind has to be answered).
 ##
 ## Each stat can be set for this level alone or for every level, so a tower
 ## that is fine on Easy and absurd on Brutal is fixed only where it is wrong.
@@ -18,6 +24,9 @@ var title: Label
 var status: Label
 var scope_button: Button
 
+## "towers", "upgrades" or "enemies".
+var mode: String = "towers"
+var mode_buttons: Dictionary = {}
 var current: String = "gun"
 ## -1 edits the global layer; otherwise the id of the level being played.
 var scope_level: int = -1
@@ -117,6 +126,16 @@ func _build() -> void:
 	wipe.pressed.connect(_reset_all)
 	scope_row.add_child(wipe)
 
+	var mode_row := HBoxContainer.new()
+	mode_row.add_theme_constant_override("separation", 6)
+	col.add_child(mode_row)
+	for pair: Array in [["towers", "Towers"], ["upgrades", "Upgrades"],
+			["enemies", "Enemies"]]:
+		var b := _small_button(str(pair[1]), 120.0)
+		b.pressed.connect(_select_mode.bind(str(pair[0])))
+		mode_row.add_child(b)
+		mode_buttons[str(pair[0])] = b
+
 	var split := HBoxContainer.new()
 	split.add_theme_constant_override("separation", 10)
 	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -129,12 +148,6 @@ func _build() -> void:
 	list_col = VBoxContainer.new()
 	list_col.add_theme_constant_override("separation", 2)
 	list_scroll.add_child(list_col)
-	for type_id: String in TDData.TOWERS:
-		var b := _small_button(str(TDData.TOWERS[type_id].get("short",
-				TDData.TOWERS[type_id]["name"])), 138.0)
-		b.pressed.connect(_select_tower.bind(type_id))
-		list_col.add_child(b)
-		tower_buttons[type_id] = b
 
 	var right := VBoxContainer.new()
 	right.add_theme_constant_override("separation", 4)
@@ -155,7 +168,53 @@ func _build() -> void:
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(status)
 
-	_select_tower(current)
+	_select_mode(mode)
+
+
+## Every subject the current mode can edit, in table order.
+func subjects() -> Array:
+	var out: Array = []
+	match mode:
+		"enemies":
+			for kind: String in TDData.ENEMIES:
+				out.append(Tuning.enemy_subject(kind))
+		"upgrades":
+			for type_id: String in TDData.TOWERS:
+				for i in TDData.TOWERS[type_id]["tracks"].size():
+					out.append(Tuning.track_subject(type_id, i))
+		_:
+			for type_id: String in TDData.TOWERS:
+				out.append(type_id)
+	return out
+
+
+func _select_mode(next_mode: String) -> void:
+	mode = next_mode
+	for child in list_col.get_children():
+		list_col.remove_child(child)
+		child.queue_free()
+	tower_buttons = {}
+	var first := ""
+	for subject: String in subjects():
+		if first == "":
+			first = subject
+		var b := _small_button(_short_label(subject), 138.0)
+		b.pressed.connect(_select_tower.bind(subject))
+		list_col.add_child(b)
+		tower_buttons[subject] = b
+	_select_tower(first)
+
+
+## Fits a subject's name in the narrow list: towers by their short name,
+## upgrade tracks by the track alone (the tower is in the title).
+func _short_label(subject: String) -> String:
+	if Tuning.is_track(subject):
+		var body := subject.trim_prefix(Tuning.TRACK_PREFIX).split("#")
+		var track: Dictionary = TDData.TOWERS[body[0]]["tracks"][int(body[1])]
+		return "%s · %s" % [TDData.TOWERS[body[0]]["short"], track["name"]]
+	if Tuning.is_enemy(subject):
+		return str(TDData.ENEMIES[subject.trim_prefix(Tuning.ENEMY_PREFIX)]["name"])
+	return str(TDData.TOWERS[subject].get("short", TDData.TOWERS[subject]["name"]))
 
 
 ## One stat: name, minus, value, plus, and a reset that drops the override.
@@ -191,11 +250,16 @@ func _build_rows() -> void:
 
 func _refresh_values() -> void:
 	var scope := scope_level
+	var base_table := Tuning.base_of(current)
+	var steps: Dictionary = {}
+	for row: Dictionary in Tuning.rows_for(current):
+		steps[str(row["key"])] = float(row["step"])
 	for key: String in value_labels:
-		var base := float(TDData.TOWERS[current].get(key, 0.0))
+		var base := float(base_table.get(key, 0.0))
 		var now := Tuning.value_of(current, key, level_id() if scope >= 0 else -1)
 		var label: Label = value_labels[key]
-		var text := "%.2f" % now if absf(now) < 10.0 else "%.0f" % now
+		# Whole-numbered stats print whole: "Ranks 4", not "Ranks 4.00".
+		var text := "%.0f" % now if float(steps.get(key, 1.0)) >= 1.0 else "%.2f" % now
 		if not is_equal_approx(now, base):
 			var delta := (now / base - 1.0) * 100.0 if not is_zero_approx(base) else 0.0
 			text += "  (%+d%%)" % int(round(delta))
@@ -205,13 +269,16 @@ func _refresh_values() -> void:
 		label.text = text
 	scope_button.text = "Scope: %s" % ("all levels" if scope_level < 0
 			else "%s only" % level_name())
-	for type_id: String in tower_buttons:
-		var button: Button = tower_buttons[type_id]
-		var tuned := not Tuning.effective(type_id, level_id()).is_empty()
+	for subject: String in tower_buttons:
+		var button: Button = tower_buttons[subject]
+		var tuned := not Tuning.effective(subject, level_id()).is_empty()
 		button.modulate = Color("ff8a65") if tuned else Color.WHITE
-		if type_id == current:
+		if subject == current:
 			button.modulate = button.modulate.lightened(0.3)
-	title.text = "%s — %s" % [TDData.TOWERS[current]["name"],
+	for id: String in mode_buttons:
+		(mode_buttons[id] as Button).modulate = Color("9ce89c") if id == mode \
+				else Color.WHITE
+	title.text = "%s — %s" % [Tuning.label_of(current),
 			"tuned" if not Tuning.effective(current, level_id()).is_empty() else "stock"]
 
 
@@ -230,7 +297,7 @@ func _toggle_scope() -> void:
 ## game can still run with.
 func _nudge(key: String, direction: float) -> void:
 	var row: Dictionary = {}
-	for candidate: Dictionary in Tuning.TUNABLE:
+	for candidate: Dictionary in Tuning.rows_for(current):
 		if str(candidate["key"]) == key:
 			row = candidate
 	if row.is_empty():
@@ -241,7 +308,7 @@ func _nudge(key: String, direction: float) -> void:
 			float(row["min"]), float(row["max"]))
 	Tuning.set_value(current, key, next, scope)
 	_refresh_values()
-	_say("%s %s = %.2f (%s)" % [TDData.TOWERS[current]["name"], row["name"], next,
+	_say("%s %s = %.2f (%s)" % [Tuning.label_of(current), row["name"], next,
 			"all levels" if scope < 0 else level_name()])
 
 

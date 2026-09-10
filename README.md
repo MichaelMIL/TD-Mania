@@ -577,11 +577,24 @@ errors as well as on any `FAIL`.
 
 ### Balance tuning (F2)
 
-Tower numbers are not fixed in code any more. **F2** during a match opens the
-balance editor: pick a tower on the left, nudge damage, fire rate, range,
-cost, splash, slow, knockback and the rest with `−` / `+`, and the change
-takes effect immediately — towers re-read their stats every frame and the
-palette reprices itself.
+Balance is not fixed in code any more. **F2** during a match opens the
+editor, which covers three kinds of subject:
+
+- **Towers** — damage, fire rate, range, cost, splash, slow, knockback, shot
+  speed, dead zone, income, aircraft, volley, chain, pierce.
+- **Upgrades** — every tower's tracks: how many ranks it has, what a rank
+  costs (`cost share`, which drives both the coin and the gold price), the
+  account level it unlocks at, and what a rank actually *does* — each
+  numeric modifier is its own row.
+- **Enemies** — health, speed, armour, bounty, lives lost on a leak, size,
+  and the trait numbers that decide how a kind must be answered: heal rate
+  and range, gold stolen, how many it splits into, sprint timing.
+
+Pick a subject on the left, nudge with `−` / `+`, and the change takes
+effect immediately — towers and creeps re-read their numbers every frame,
+the palette reprices itself, and an installed rank changes under a tower
+already on the board. Only numbers are editable; flags like *flying* or
+*ignores fire* stay in `data.gd`.
 
 The **Scope** button decides where a change is written: *all levels* or *this
 level only*, so a tower that is fair on Easy and absurd on Brutal can be
@@ -593,8 +606,13 @@ are shown in orange with the percentage change, and every row has its own
 Overrides live in that one file, never in a save slot, and deleting it
 restores the numbers in `data.gd`. The dev harnesses call
 `Tuning.use_clean_state()`, so a simulation always measures stock balance.
-Anything that reads a tower stat must go through `TDData.tower_def(id)` — the
-raw `TDData.TOWERS` table bypasses the editor.
+
+Subjects are addressed by id — a bare tower id (`gun`), a creep as
+`enemy:grunt`, one upgrade track as `track:gun#0` — so the file stays
+readable and older files, which only ever held towers, still load. Anything
+that reads a balance number must go through `TDData.tower_def(id)`,
+`TDData.tracks(id)` or `TDData.enemy_def(kind)`; the raw `TDData.TOWERS` and
+`TDData.ENEMIES` tables bypass the editor.
 
 ### Targeting grid
 

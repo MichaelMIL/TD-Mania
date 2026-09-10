@@ -773,7 +773,7 @@ func _spawn(kind: String) -> void:
 func _on_enemy_split(parent: Enemy, kind: String, count: int) -> void:
 	for i in count:
 		var child := Enemy.new()
-		child.setup(kind, parent.max_hp / float(TDData.ENEMIES[kind]["hp"]) * 0.45,
+		child.setup(kind, parent.max_hp / float(TDData.enemy_def(kind)["hp"]) * 0.45,
 				1.0, parent.path)
 		child.died.connect(_on_enemy_died)
 		child.leaked.connect(_on_enemy_leaked)
