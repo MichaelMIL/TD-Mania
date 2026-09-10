@@ -127,6 +127,20 @@ price. Unlocks are gated by account level and by the tower's own prerequisites
 Everything here is permanent and applies on every map. The screen also has a
 two-step **Reset all progress** button.
 
+### Reading the screen
+
+The top bar is split in two: **state on the left** — map, difficulty,
+lives, gold, wave against the map's finish line, coins — and **controls on
+the right**. Every field in it has a fixed width and clips rather than
+pushing its neighbours, and the only thing that flexes is the gap between
+the two halves, so a long map name and six-figure gold cannot shove the
+buttons off the edge (which is exactly what used to happen). The compact
+controls carry tooltips naming the key that does the same thing.
+
+The menu's account strip is two rows for the same reason: level and XP
+progress on top, then what the account owns (coins, stars, maps cleared)
+with the way into slots, options, stats and the tech tree on the right.
+
 ## How to play
 
 | Input | Action |

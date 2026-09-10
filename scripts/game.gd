@@ -135,7 +135,7 @@ func _ready() -> void:
 	hud.game = self
 	add_child(hud)
 	hud.build()
-	hud.btn_auto.text = "Auto: On" if auto_start else "Auto: Off"
+	hud.btn_auto.text = "Auto ●" if auto_start else "Auto ○"
 	hud.btn_auto.modulate = Color("9ce89c") if auto_start else Color.WHITE
 	hud.sync_sound_button()
 	hud.refresh_info()
@@ -1416,11 +1416,11 @@ func _cycle_volume() -> void:
 
 func _toggle_auto() -> void:
 	auto_start = not auto_start
-	hud.btn_auto.text = "Auto: On" if auto_start else "Auto: Off"
+	hud.btn_auto.text = "Auto ●" if auto_start else "Auto ○"
 	hud.btn_auto.modulate = Color("9ce89c") if auto_start else Color.WHITE
 
 
 func _toggle_pause() -> void:
 	paused = not paused
-	hud.btn_pause.text = "Resume" if paused else "Pause"
+	hud.btn_pause.text = "▶" if paused else "II"
 	Engine.time_scale = 0.0 if paused else float(SPEEDS[speed_index])

@@ -185,6 +185,12 @@ func hide_victory() -> void:
 	lbl_over_title.add_theme_color_override("font_color", Color("ef5350"))
 
 
+## The top bar carries the run's state on the left and its controls on the
+## right. Everything in it has a fixed width: with 987654 gold, 128 lives
+## and a long map name, the old layout pushed the buttons off the edge of
+## the screen. Numbers now clip inside their own field instead of shoving
+## their neighbours, and the gap between the two halves is the only thing
+## that flexes.
 func _build_topbar(root: Control) -> void:
 	var bar := PanelContainer.new()
 	bar.offset_right = float(TDData.MAP_W)
@@ -193,62 +199,90 @@ func _build_topbar(root: Control) -> void:
 	root.add_child(bar)
 
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
+	row.add_theme_constant_override("separation", 10)
 	bar.add_child(row)
 
-	lbl_level = _label(str(game.level_def["name"]), 17, Color("b0bec5"))
-	lbl_level.custom_minimum_size.x = 148
-	lbl_lives = _label("", 18, Color("ef5350"))
-	lbl_lives.custom_minimum_size.x = 92
-	lbl_gold = _label("", 18, Color("ffd54f"))
-	lbl_gold.custom_minimum_size.x = 104
-	lbl_wave = _label("", 18, Color("e3f2fd"))
-	lbl_wave.custom_minimum_size.x = 86
-	lbl_coins = _label("", 15, Color("ffca28"))
-	lbl_coins.custom_minimum_size.x = 118
-	lbl_coins.tooltip_text = "Coins banked on this save, plus what this run has earned so far"
+	# ---- who and where
+	var identity := VBoxContainer.new()
+	identity.add_theme_constant_override("separation", 0)
+	identity.custom_minimum_size.x = 168.0
+	row.add_child(identity)
+	lbl_level = _label(str(game.level_def["name"]), 16, Color("e3f2fd"))
+	lbl_level.clip_text = true
+	lbl_level.custom_minimum_size.x = 168.0
+	lbl_level.tooltip_text = str(game.level_def["name"])
+	identity.add_child(lbl_level)
 	var tier: Dictionary = TDData.tier_of(game.level_def)
-	var badge := _label("%s %d/4" % [str(tier["name"]).to_upper(),
-			int(game.level_def["tier"]) + 1], 13, tier["color"])
-	badge.custom_minimum_size.x = 92
-	for l: Label in [lbl_level, badge, lbl_lives, lbl_gold, lbl_wave, lbl_coins]:
+	var badge := _label("%s  ·  %d/4" % [str(tier["name"]).to_upper(),
+			int(game.level_def["tier"]) + 1], 11, tier["color"])
+	identity.add_child(badge)
+
+	# ---- how the run is going
+	lbl_lives = _stat_field(112.0, 18, Color("ef5350"),
+			"Lives left. A creep that reaches the base costs one, or more.")
+	lbl_gold = _stat_field(150.0, 18, Color("ffd54f"),
+			"Gold in hand. Spent on towers and on installing upgrade ranks.")
+	lbl_wave = _stat_field(150.0, 18, Color("e3f2fd"),
+			"The wave you are on, and the one that clears the map.")
+	lbl_coins = _stat_field(130.0, 15, Color("ffca28"),
+			"Coins banked on this save, plus what this run has earned so far.")
+	for l: Label in [lbl_lives, lbl_gold, lbl_wave, lbl_coins]:
 		row.add_child(l)
 
+	# Only this gives, so the controls stay put however big the numbers get.
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	spacer.custom_minimum_size.x = 8.0
 	row.add_child(spacer)
 
-	btn_start = _button("Start Wave", 14, Vector2(116.0, 44.0))
+	# ---- controls, compact enough to survive the widest numbers
+	btn_start = _button("Start Wave", 14, Vector2(112.0, 44.0))
+	btn_start.tooltip_text = "Call the next wave in early for bonus gold (%s)" \
+			% Progress.key_name("start_wave")
 	btn_start.pressed.connect(game._on_start_pressed)
 	row.add_child(btn_start)
 
-	btn_speed = _button("1x", 14, Vector2(50.0, 44.0))
+	btn_speed = _button("1x", 15, Vector2(46.0, 44.0))
+	btn_speed.tooltip_text = "Game speed (%s)" % Progress.key_name("speed")
 	btn_speed.pressed.connect(game._cycle_speed)
 	row.add_child(btn_speed)
 
-	btn_pause = _button("Pause", 14, Vector2(74.0, 44.0))
+	btn_pause = _button("II", 15, Vector2(44.0, 44.0))
+	btn_pause.tooltip_text = "Pause (%s)" % Progress.key_name("pause")
 	btn_pause.pressed.connect(game._toggle_pause)
 	row.add_child(btn_pause)
 
-	btn_auto = _button("Auto: Off", 13, Vector2(88.0, 44.0))
-	btn_auto.tooltip_text = "Automatically call each wave in early and collect the bonus gold"
+	btn_auto = _button("Auto", 12, Vector2(54.0, 44.0))
+	btn_auto.tooltip_text = "Automatically call each wave in early and collect the bonus gold (%s)" \
+			% Progress.key_name("auto")
 	btn_auto.pressed.connect(game._toggle_auto)
 	row.add_child(btn_auto)
 
-	btn_sound = _button("", 13, Vector2(58.0, 44.0))
+	btn_sound = _button("", 13, Vector2(48.0, 44.0))
 	btn_sound.tooltip_text = "Cycle volume: full, quiet, muted"
 	btn_sound.pressed.connect(game._cycle_volume)
 	row.add_child(btn_sound)
 
-	btn_surrender = _button("Give up", 13, Vector2(80.0, 44.0))
+	btn_surrender = _button("End run", 12, Vector2(64.0, 44.0))
 	btn_surrender.tooltip_text = "End this run now and collect what it earned"
 	btn_surrender.pressed.connect(game._surrender)
 	row.add_child(btn_surrender)
 
-	var menu := _button("Menu", 14, Vector2(66.0, 44.0))
-	menu.tooltip_text = "Park this run and come back to it later"
+	var menu := _button("Menu", 13, Vector2(58.0, 44.0))
+	menu.tooltip_text = "Park this run and come back to it later (%s)" \
+			% Progress.key_name("menu")
 	menu.pressed.connect(game._to_menu)
 	row.add_child(menu)
+
+
+## A number that owns its space: fixed width, clipped rather than pushy.
+func _stat_field(width: float, size: int, color: Color, hint: String) -> Label:
+	var l := _label("", size, color)
+	l.custom_minimum_size.x = width
+	l.clip_text = true
+	l.tooltip_text = hint
+	l.mouse_filter = Control.MOUSE_FILTER_STOP
+	return l
 
 
 ## Right-hand build palette: one card per tower, dragged onto the map.
@@ -571,25 +605,25 @@ func _build_game_over(root: Control) -> void:
 
 func sync_sound_button() -> void:
 	var sfx := Progress.volume("sfx")
-	btn_sound.text = "Vol 3" if sfx > 0.5 else ("Vol 1" if sfx > 0.001 else "Muted")
+	btn_sound.text = "Vol 3" if sfx > 0.5 else ("Vol 1" if sfx > 0.001 else "Mute")
 	btn_sound.modulate = Color.WHITE if sfx > 0.001 else Color(0.6, 0.62, 0.68)
 
 
 func update() -> void:
 	if frozen:
 		return
-	lbl_lives.text = "Lives %d" % game.lives
-	lbl_gold.text = "Gold $%d" % game.gold
+	lbl_lives.text = "♥ %d" % game.lives
+	lbl_gold.text = "$ %d" % game.gold
 	# The finish line, so a run has a shape rather than going on forever.
 	var target := TDData.clear_wave(game.level_def)
 	lbl_wave.text = "Wave %d / %d" % [maxi(1, game.wave), target] \
-			if not game.map_cleared else "Wave %d  (cleared)" % maxi(1, game.wave)
+			if not game.map_cleared else "Wave %d ✓" % maxi(1, game.wave)
 	# Banked coins plus what the run would pay out if it ended now.
 	var pending := 0
 	if not game.rewarded and game.wave > 1:
 		pending = int(Progress.run_reward(game.wave - 1, game.score, int(game.level_def["tier"]))["coins"])
-	lbl_coins.text = "%d c" % Progress.coins if pending <= 0 \
-			else "%d c (+%d)" % [Progress.coins, pending]
+	lbl_coins.text = "◈ %d" % Progress.coins if pending <= 0 \
+			else "◈ %d +%d" % [Progress.coins, pending]
 	if game.game_over:
 		lbl_status.text = "Base destroyed on wave %d" % game.wave
 		btn_start.disabled = true

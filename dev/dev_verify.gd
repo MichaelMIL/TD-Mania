@@ -1813,6 +1813,20 @@ func _check_victory() -> void:
 			TDData.clear_wave(TDData.LEVELS[0])
 			> int(TDData.objectives_for(TDData.LEVELS[0])[0]["n"]))
 
+	# The account levels to a cap, and the display must not claim progress
+	# towards a level that does not exist.
+	var was_xp: int = Progress.xp
+	Progress.xp = 50
+	check("an early account is levelling", not bool(
+			Progress.level_progress().get("capped", false)))
+	Progress.xp = 99999999
+	var capped: Dictionary = Progress.level_progress()
+	check("a maxed account is at the cap", bool(capped.get("capped", false))
+			and int(capped["level"]) == Progress.MAX_LEVEL)
+	check("and its bar reads full rather than overflowing",
+			is_equal_approx(float(capped["ratio"]), 1.0))
+	Progress.xp = was_xp
+
 	# Multi-lane maps have to fund a second front, or they are a tier
 	# harder than the tier says they are.
 	var single: Dictionary = {}

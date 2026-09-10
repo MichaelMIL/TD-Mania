@@ -314,7 +314,9 @@ func _on_reset() -> void:
 
 func _refresh() -> void:
 	var info := Progress.level_progress()
-	lbl_level.text = "Level %d   ·   %d / %d XP" % [int(info["level"]), Progress.xp,
+	lbl_level.text = "Level %d (the cap)   ·   %d XP" % [int(info["level"]), Progress.xp] \
+			if bool(info.get("capped", false)) \
+			else "Level %d   ·   %d / %d XP" % [int(info["level"]), Progress.xp,
 			int(info["to"])]
 	lbl_coins.text = "%d coins" % Progress.coins
 	if btn_respec != null and not respec_armed:

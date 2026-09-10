@@ -121,78 +121,114 @@ func _build() -> void:
 	foot.add_child(quit)
 
 
-## Account strip: level, XP progress, coins, next unlock, and the way into
-## the tech tree.
+## Account strip. Two rows rather than one: progress on top, what the
+## account owns and where it can go underneath. Eight things fought over
+## one line before, and the XP bar always lost.
 func _account_bar() -> Control:
 	var info := Progress.level_progress()
 	var panel := PanelContainer.new()
 	panel.add_theme_stylebox_override("panel", _sb(Color("101823"), Color("2c3a52"), 8))
 
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 16)
-	panel.add_child(row)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 8)
+	panel.add_child(col)
 
-	row.add_child(_label("LEVEL %d" % int(info["level"]), 20, Color("4fc3f7")))
+	# ---- row one: level and the road to the next one
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 14)
+	col.add_child(top)
 
-	var bar_box := VBoxContainer.new()
-	bar_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bar_box.add_theme_constant_override("separation", 2)
-	row.add_child(bar_box)
+	var level_label := _label("LEVEL %d" % int(info["level"]), 20, Color("4fc3f7"))
+	level_label.custom_minimum_size.x = 110.0
+	top.add_child(level_label)
 
 	var bar := ProgressBar.new()
 	bar.custom_minimum_size = Vector2(0.0, 14.0)
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bar.min_value = 0.0
 	bar.max_value = 1.0
 	bar.value = float(info["ratio"])
 	bar.show_percentage = false
-	bar_box.add_child(bar)
-
+	# The default theme draws an empty bar as nothing at all, so a fresh
+	# account looked like it had no XP bar rather than an empty one.
+	var track := StyleBoxFlat.new()
+	track.bg_color = Color("1b2637")
+	track.set_corner_radius_all(7)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Color("4fc3f7")
+	fill.set_corner_radius_all(7)
+	bar.add_theme_stylebox_override("background", track)
+	bar.add_theme_stylebox_override("fill", fill)
 	var span := int(info["to"]) - int(info["from"])
 	var into := Progress.xp - int(info["from"])
-	bar_box.add_child(_label("%d / %d XP to level %d" % [into, span, int(info["level"]) + 1],
-			11, Color(1, 1, 1, 0.5)))
+	bar.tooltip_text = "Level %d is the cap; XP still counts towards records." \
+			% Progress.MAX_LEVEL if bool(info.get("capped", false)) \
+			else "%d / %d XP to level %d" % [into, span, int(info["level"]) + 1]
+	bar.mouse_filter = Control.MOUSE_FILTER_STOP
+	top.add_child(bar)
+
+	var xp_label := _label("Level %d — the cap" % Progress.MAX_LEVEL
+			if bool(info.get("capped", false)) else "%d / %d XP" % [into, span],
+			12, Color(1, 1, 1, 0.55))
+	xp_label.custom_minimum_size.x = 130.0
+	xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	top.add_child(xp_label)
 
 	var next: Dictionary = Progress.next_unlock()
 	var unlock_text := "Everything unlocked"
 	if not next.is_empty():
 		unlock_text = "Next at Lv %d: %s" % [int(next["level"]), next["what"]]
-	row.add_child(_label(unlock_text, 13, Color("90a4ae")))
+	var unlock_label := _label(unlock_text, 13, Color("90a4ae"))
+	unlock_label.custom_minimum_size.x = 250.0
+	unlock_label.clip_text = true
+	unlock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	unlock_label.tooltip_text = unlock_text
+	top.add_child(unlock_label)
 
-	row.add_child(_label("%d coins" % Progress.coins, 18, Color("ffd54f")))
-	row.add_child(_label("★ %d/%d" % [Progress.total_stars(), TDData.LEVELS.size() * 3],
-			18, Color("ffd54f")))
-	row.add_child(_label("Cleared %d/%d" % [Progress.cleared_count(),
-			TDData.LEVELS.size()], 15, Color("9ccc65")))
+	# ---- row two: what the account owns, and where it can go
+	var bottom := HBoxContainer.new()
+	bottom.add_theme_constant_override("separation", 14)
+	col.add_child(bottom)
 
-	var slots := Button.new()
-	slots.text = "Slot %d" % (Progress.slot + 1)
-	slots.tooltip_text = "Switch save slot"
-	slots.custom_minimum_size = Vector2(90.0, 36.0)
-	slots.focus_mode = Control.FOCUS_NONE
-	slots.pressed.connect(func(): get_tree().change_scene_to_file("res://main.tscn"))
-	row.add_child(slots)
+	bottom.add_child(_owned("◈ %d" % Progress.coins, Color("ffd54f"), 150.0,
+			"Coins earned from runs. Spent in the tech tree."))
+	bottom.add_child(_owned("★ %d / %d" % [Progress.total_stars(),
+			TDData.LEVELS.size() * 3], Color("ffd54f"), 120.0,
+			"Objective stars. Three on every map."))
+	bottom.add_child(_owned("Cleared %d / %d" % [Progress.cleared_count(),
+			TDData.LEVELS.size()], Color("9ccc65"), 150.0,
+			"Maps whose last wave you have beaten."))
 
-	var options := Button.new()
-	options.text = "Options"
-	options.custom_minimum_size = Vector2(96.0, 36.0)
-	options.focus_mode = Control.FOCUS_NONE
-	options.pressed.connect(func(): get_tree().change_scene_to_file("res://options.tscn"))
-	row.add_child(options)
+	var gap := Control.new()
+	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bottom.add_child(gap)
 
-	var stats := Button.new()
-	stats.text = "Stats"
-	stats.custom_minimum_size = Vector2(88.0, 36.0)
-	stats.focus_mode = Control.FOCUS_NONE
-	stats.pressed.connect(func(): get_tree().change_scene_to_file("res://stats.tscn"))
-	row.add_child(stats)
-
-	var tech := Button.new()
-	tech.text = "Tech Tree"
-	tech.custom_minimum_size = Vector2(120.0, 36.0)
-	tech.focus_mode = Control.FOCUS_NONE
-	tech.pressed.connect(func(): get_tree().change_scene_to_file("res://tech.tscn"))
-	row.add_child(tech)
+	for entry: Array in [
+		["Slot %d" % (Progress.slot + 1), "res://main.tscn", 88.0,
+			"Switch save slot"],
+		["Options", "res://options.tscn", 92.0, "Sound, window size and keys"],
+		["Stats", "res://stats.tscn", 84.0, "Everything this save has done"],
+		["Tech Tree", "res://tech.tscn", 112.0, "Spend coins on permanent upgrades"],
+	]:
+		var b := Button.new()
+		b.text = str(entry[0])
+		b.tooltip_text = str(entry[3])
+		b.custom_minimum_size = Vector2(float(entry[2]), 36.0)
+		b.focus_mode = Control.FOCUS_NONE
+		b.pressed.connect(func(): get_tree().change_scene_to_file(str(entry[1])))
+		bottom.add_child(b)
 	return panel
+
+
+## One thing the account owns, in a field wide enough for a big number.
+func _owned(text: String, color: Color, width: float, hint: String) -> Label:
+	var l := _label(text, 17, color)
+	l.custom_minimum_size.x = width
+	l.clip_text = true
+	l.tooltip_text = hint
+	l.mouse_filter = Control.MOUSE_FILTER_STOP
+	return l
 
 
 ## Area banner: name, blurb, difficulty span and how many of its maps have

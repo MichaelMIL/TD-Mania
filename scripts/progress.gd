@@ -779,9 +779,13 @@ static func xp_for_level(level: int) -> int:
 
 
 ## Account level for an arbitrary XP total.
+## The account stops levelling here; everything is unlocked well before it.
+const MAX_LEVEL := 40
+
+
 static func level_for_xp(total: int) -> int:
 	var l := 1
-	while l < 40 and total >= xp_for_level(l + 1):
+	while l < MAX_LEVEL and total >= xp_for_level(l + 1):
 		l += 1
 	return l
 
@@ -797,8 +801,11 @@ static func level_progress() -> Dictionary:
 	var from := xp_for_level(l)
 	var to := xp_for_level(l + 1)
 	var span: int = maxi(1, to - from)
-	return {"level": l, "from": from, "to": to,
-		"ratio": clampf(float(xp - from) / float(span), 0.0, 1.0)}
+	var capped := l >= MAX_LEVEL
+	return {"level": l, "from": from, "to": to, "capped": capped,
+		# Past the cap there is nothing left to fill, so the bar reads full
+		# rather than showing more XP earned than the next level needs.
+		"ratio": 1.0 if capped else clampf(float(xp - from) / float(span), 0.0, 1.0)}
 
 
 static func tower_unlock_level(type_id: String) -> int:
