@@ -243,8 +243,18 @@ static func wave_rule_active(rule: Dictionary, n: int) -> bool:
 ## Three per map, worth a star each. Two come from the tier — get deep, and
 ## get deep without being touched — and the third is the map's own `goal`.
 ## They are what turns "go as deep as you can" into a reason to come back.
+## The wave that finishes a map. Reaching it is a win — the run can carry on
+## into endless afterwards, but the map counts as cleared and stays cleared.
+static var TIER_CLEAR_WAVE: Array = [25, 24, 22, 20]
+
 static var TIER_GOAL_WAVE: Array = [15, 14, 12, 10]
 static var TIER_CLEAN_WAVE: Array = [8, 8, 7, 6]
+
+
+## How many waves this map takes to clear.
+static func clear_wave(level: Dictionary) -> int:
+	var tier := clampi(int(level.get("tier", 0)), 0, TIER_CLEAR_WAVE.size() - 1)
+	return int(level.get("clear_wave", TIER_CLEAR_WAVE[tier]))
 
 
 static func objectives_for(level: Dictionary) -> Array:

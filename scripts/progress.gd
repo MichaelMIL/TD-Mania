@@ -32,6 +32,8 @@ static var stats: Dictionary = {}
 static var runs: Dictionary = {}
 ## Objective stars earned per map: level id -> bitmask of objectives met.
 static var stars: Dictionary = {}
+## Maps whose last wave has been beaten: level id -> waves cleared to.
+static var cleared: Dictionary = {}
 
 ## Reward weights. A run pays out on waves survived and score, scaled by the
 ## map's difficulty tier.
@@ -131,8 +133,9 @@ static func migrate_legacy() -> void:
 ##   2  one parked run per map under [runs], run stats without the per-kind
 ##      kill and leak tallies
 ##   3  versioned, and every parked run carries the full stat set
-##   4  current: per-map objective stars under [stars]
-const SAVE_VERSION := 4
+##   4  per-map objective stars under [stars]
+##   5  current: which maps have been cleared, under [cleared]
+const SAVE_VERSION := 5
 
 ## The keys a parked run's stats must have. Kept here rather than imported
 ## from game.gd so migration does not depend on the match scene.
@@ -169,6 +172,10 @@ static func migrate_config(cfg: ConfigFile, from_version: int) -> int:
 					cfg.set_value("runs", level_id, legacy)
 				if cfg.has_section("run"):
 					cfg.erase_section("run")
+			4:
+				# [cleared] is new in 5; an older save has cleared nothing
+				# yet, so there is nothing to convert.
+				pass
 			3:
 				# Stars are new in 4. An older save simply has none yet, so
 				# there is nothing to convert - the arm exists so the chain
@@ -228,6 +235,7 @@ static func apply_config(cfg: ConfigFile) -> void:
 	runs = {}
 	stats = {}
 	stars = {}
+	cleared = {}
 	keys = {}
 	tower_ranks = {}
 	xp = int(cfg.get_value("progress", "xp", 0))
@@ -252,6 +260,9 @@ static func apply_config(cfg: ConfigFile) -> void:
 	if cfg.has_section("stars"):
 		for key: String in cfg.get_section_keys("stars"):
 			stars[key] = int(cfg.get_value("stars", key, 0))
+	if cfg.has_section("cleared"):
+		for key: String in cfg.get_section_keys("cleared"):
+			cleared[key] = int(cfg.get_value("cleared", key, 0))
 	keys = {}
 	if cfg.has_section("keys"):
 		for key: String in cfg.get_section_keys("keys"):
@@ -279,6 +290,8 @@ static func save_state() -> void:
 	cfg.set_value("options", "music", volume("music"))
 	for key: String in stars:
 		cfg.set_value("stars", key, int(stars[key]))
+	for key: String in cleared:
+		cfg.set_value("cleared", key, int(cleared[key]))
 	for key: String in keys:
 		cfg.set_value("keys", key, int(keys[key]))
 	cfg.set_value("options", "window_scale", window_scale())
@@ -640,6 +653,31 @@ static func respec() -> int:
 	return refund
 
 
+## Whether this map has ever been finished, and how deep that clear went.
+static func is_cleared(level_id: String) -> bool:
+	load_state()
+	return int(cleared.get(level_id, 0)) > 0
+
+
+static func cleared_count() -> int:
+	load_state()
+	var total := 0
+	for key: String in cleared:
+		if int(cleared[key]) > 0:
+			total += 1
+	return total
+
+
+## Records a finished map. Returns true the first time, so the game can make
+## something of it.
+static func record_clear(level_id: String, waves: int) -> bool:
+	load_state()
+	var first := int(cleared.get(level_id, 0)) == 0
+	cleared[level_id] = maxi(int(cleared.get(level_id, 0)), waves)
+	save_state()
+	return first
+
+
 static func best_wave(level_id: String) -> int:
 	load_state()
 	return int(bests.get(level_id, 0))
@@ -706,6 +744,7 @@ static func use_clean_state() -> void:
 	tower_ranks = {}
 	stats = {}
 	stars = {}
+	cleared = {}
 	keys = {}
 	runs = {}
 	# Balance overrides are excluded too, so a simulation measures the numbers
@@ -722,6 +761,7 @@ static func reset() -> void:
 	tower_ranks = {}
 	stats = {}
 	stars = {}
+	cleared = {}
 	runs = {}
 	if not read_only:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(slot_path(slot)))

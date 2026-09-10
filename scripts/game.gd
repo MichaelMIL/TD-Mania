@@ -78,6 +78,9 @@ var cursor: Cursor
 
 var surrender_armed: bool = false
 var surrendered: bool = false
+## Set once the map's last wave has been beaten. The run can carry on into
+## endless afterwards, which is why this is separate from `game_over`.
+var map_cleared: bool = false
 ## Set when a developer cheat is used; keeps the run out of the record books.
 var cheats_used: bool = false
 var cheats: Cheats
@@ -648,6 +651,8 @@ func _end_wave() -> void:
 	fx_text(Vector2(640.0, 130.0), "Wave %d cleared  +$%d" % [wave, bonus], Color("66bb6a"), 24)
 	run_stats["peak_gold"] = maxi(int(run_stats.get("peak_gold", 0)), gold)
 	_award_stars()
+	if not map_cleared and wave >= TDData.clear_wave(level_def):
+		_trigger_victory()
 
 
 ## Builds a flat, time-stamped spawn list for the given wave number, scaled by
@@ -958,6 +963,38 @@ func _surrender() -> void:
 		return
 	surrendered = true
 	_trigger_game_over()
+
+
+## The map's last wave is down. This is a win, not an ending: the panel
+## offers to carry on into endless, and the run keeps its board either way.
+func _trigger_victory() -> void:
+	map_cleared = true
+	var first := false
+	if not cheats_used:
+		first = Progress.record_clear(str(level_def["id"]), wave)
+		Progress.record_wave(str(level_def["id"]), wave)
+	# Finishing a map pays out there and then, so a victory is banked even
+	# if the endless run that follows ends badly.
+	var reward := _bank_reward()
+	# Anything after this is a fresh run as far as rewards are concerned.
+	rewarded = false
+	var payout := ""
+	if not reward.is_empty():
+		payout = "+%d XP   +%d coins" % [int(reward["xp"]), int(reward["coins"])]
+		if bool(reward["levelled"]):
+			payout += "     LEVEL %d!" % int(reward["level_after"])
+	Audio.play("wave_clear", 0.0, 0.0)
+	fx_text(Vector2(640.0, 170.0), "MAP CLEARED", Color("ffd54f"), 34)
+	hud.show_victory("%s cleared on wave %d.\n%s\nScore %d   Lives left %d   Leaks %d\n%s\n%s"
+			% [level_def["name"], wave,
+			"First clear!" if first else "Cleared before, and again.",
+			score, lives, leaked_total, payout, objective_summary()])
+
+
+## Leaves the victory panel behind and plays on. The map stays cleared.
+func continue_endless() -> void:
+	hud.hide_victory()
+	break_timer = BREAK_TIME
 
 
 func _trigger_game_over() -> void:

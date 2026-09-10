@@ -161,6 +161,8 @@ func _account_bar() -> Control:
 	row.add_child(_label("%d coins" % Progress.coins, 18, Color("ffd54f")))
 	row.add_child(_label("★ %d/%d" % [Progress.total_stars(), TDData.LEVELS.size() * 3],
 			18, Color("ffd54f")))
+	row.add_child(_label("Cleared %d/%d" % [Progress.cleared_count(),
+			TDData.LEVELS.size()], 15, Color("9ccc65")))
 
 	var slots := Button.new()
 	slots.text = "Slot %d" % (Progress.slot + 1)
@@ -340,15 +342,18 @@ func _level_card(index: int) -> Control:
 	var water_cells := 0
 	for r: Array in d["water"]:
 		water_cells += int(r[2]) * int(r[3])
-	var stats := _label("Gold %d · Lives %d\nHP x%.2f · Water %d" % [
+	var stats := _label("Gold %d · Lives %d · Clear at wave %d\nHP x%.2f · Water %d" % [
 		int(TDData.level_stat(d, "gold")), int(TDData.level_stat(d, "lives")),
-		TDData.level_stat(d, "hp_scale"), water_cells], 12, Color("90a4ae"))
+		TDData.clear_wave(d), TDData.level_stat(d, "hp_scale"), water_cells],
+		12, Color("90a4ae"))
 	text.add_child(stats)
 
 	var unlocked := Progress.level_unlocked(d)
 	var record := int(best.get(str(d["id"]), 0))
 	var parked: Dictionary = Progress.run_for(str(d["id"]))
 	var status := "Best: wave %d" % record if record > 0 else "Not played yet"
+	if Progress.is_cleared(str(d["id"])):
+		status = "CLEARED · %s" % status
 	if not unlocked:
 		status = "Locked"
 	elif not parked.is_empty():

@@ -364,6 +364,20 @@ then an outer ring as the total investment rises.
 | Helipad | Autocannon (4), Ammo Belts (3), Uprated Rotors (3), Wing Escort (1) | — |
 | Command Post | Doctrine (3), Logistics (3), Comms Array (3) | — |
 
+### Clearing a map
+
+Every map has a finish line: wave 25 on Easy down to wave 20 on Brutal
+(`TDData.clear_wave`, shown on the level card and in the top bar as
+"Wave 12 / 25"). Beating that wave **clears the map** — a gold panel, the
+run's XP and coins banked there and then, and a permanent record on the
+account (`Progress.cleared`, shown as "CLEARED" on the card and as a count
+in the account bar).
+
+It is a win, not an ending. **Keep playing — endless** hides the panel and
+carries the same board on for as long as you can hold it; the map stays
+cleared whatever happens next, and rewards from the endless run are banked
+separately when it does end.
+
 ### Objectives and stars
 
 Every map carries three objectives, worth a star each: clear a target wave

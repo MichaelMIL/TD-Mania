@@ -213,6 +213,7 @@ func _ready() -> void:
 	_check_flyers()
 	_check_board_tooltips()
 	_check_objectives()
+	_check_victory()
 	_check_respec()
 	_check_options()
 	_check_art_prompts()
@@ -1727,6 +1728,80 @@ func _check_respec() -> void:
 	for r in 2:
 		Progress.buy(str(first["id"]))
 	check("prices reset with the ranks", Progress.spent_on_tech() > 0)
+	Progress.use_clean_state()
+
+
+
+
+## A map can be finished. Reaching its last wave is a win that sticks, and
+## the run may carry on into endless afterwards.
+func _check_victory() -> void:
+	# Every map has a finish line, and harder maps end sooner.
+	var missing: Array = []
+	var deepest: Array = [0, 0, 0, 0]
+	for level: Dictionary in TDData.LEVELS:
+		var target := TDData.clear_wave(level)
+		if target < 5 or target > 60:
+			missing.append(str(level["id"]))
+		deepest[int(level.get("tier", 0))] = maxi(
+				deepest[int(level.get("tier", 0))], target)
+	check("every map has a sensible finish line (%s)" % ",".join(missing),
+			missing.is_empty())
+	var ladder := true
+	for i in range(1, 4):
+		if deepest[i] > deepest[i - 1]:
+			ladder = false
+	check("harder maps finish sooner (%s)" % str(deepest), ladder)
+	check("clearing a map is further than its wave objective",
+			TDData.clear_wave(TDData.LEVELS[0])
+			> int(TDData.objectives_for(TDData.LEVELS[0])[0]["n"]))
+
+	# Records: first clear is reported once, and depth is kept.
+	Progress.use_clean_state()
+	Progress.read_only = true
+	check("a fresh account has cleared nothing",
+			not Progress.is_cleared("verdant") and Progress.cleared_count() == 0)
+	check("the first clear says so", Progress.record_clear("verdant", 25))
+	check("and is remembered", Progress.is_cleared("verdant")
+			and Progress.cleared_count() == 1)
+	check("a second clear is not a first", not Progress.record_clear("verdant", 22))
+	check("but a deeper one is kept",
+			int(Progress.cleared.get("verdant", 0)) == 25)
+	var cfg := ConfigFile.new()
+	cfg.set_value("meta", "version", Progress.SAVE_VERSION)
+	cfg.set_value("cleared", "ashen", 20)
+	Progress.apply_config(cfg)
+	check("clears survive a save round trip", Progress.is_cleared("ashen")
+			and not Progress.is_cleared("verdant"))
+	var old_save := ConfigFile.new()
+	old_save.set_value("stars", "verdant", 3)
+	Progress.migrate_config(old_save, Progress.detect_version(old_save))
+	check("a save from before clears existed still migrates",
+			int(old_save.get_value("meta", "version", 0)) == Progress.SAVE_VERSION)
+
+	# The match itself: reaching the last wave wins, and play continues.
+	Progress.use_clean_state()
+	var saved_wave: int = game.wave
+	var was_cleared: bool = game.map_cleared
+	game.map_cleared = false
+	game.wave = TDData.clear_wave(game.level_def)
+	game.in_wave = true
+	game._end_wave()
+	check("beating the last wave clears the map", game.map_cleared)
+	check("and the win is on screen", game.hud.over_root.visible
+			and game.hud.btn_continue.visible)
+	check("without ending the run", not game.game_over)
+	game.continue_endless()
+	check("carrying on hides the panel and keeps the board",
+			not game.hud.over_root.visible and game.map_cleared)
+	game.wave += 1
+	game.in_wave = true
+	game._end_wave()
+	check("and a cleared map does not announce itself again",
+			not game.hud.over_root.visible)
+	game.map_cleared = was_cleared
+	game.wave = saved_wave
+	game.in_wave = false
 	Progress.use_clean_state()
 
 

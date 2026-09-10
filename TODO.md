@@ -146,6 +146,15 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
       card is re-checked every frame, since creeps walk out from under a
       still cursor.
 
+- [x] **A map can be won.** *Implemented 2026-09-10.* Every map has a
+      finish line from its tier (`TDData.clear_wave`: 25 on Easy down to 20
+      on Brutal), shown on the level card and counted down in the top bar
+      as "Wave 12 / 25". Beating it clears the map: a gold victory panel,
+      rewards banked on the spot, a permanent record in `Progress.cleared`
+      ("CLEARED" on the card, a count in the account bar) — and a **Keep
+      playing — endless** button that carries the same board on, since the
+      clear sticks whatever happens afterwards.
+
 ## Do last
 
 - [x] **Cut what the game costs the machine.** *Implemented 2026-09-10.*

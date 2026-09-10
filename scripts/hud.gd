@@ -43,6 +43,8 @@ var btn_sell: Button
 var btn_target: Button
 var over_root: Control
 var lbl_over_title: Label
+var btn_continue: Button
+var over_panel: PanelContainer
 var btn_surrender: Button
 var btn_sound: Button
 var lbl_over: Label
@@ -160,6 +162,27 @@ func refresh_creep_tip() -> void:
 	wanted.x = minf(wanted.x, float(TDData.MAP_W) - card.x - 8.0)
 	wanted.y = minf(wanted.y, float(TDData.MAP_H) - card.y - 8.0)
 	creep_tip.position = wanted
+
+
+## The map is finished. Same panel as defeat, dressed as a win, plus the way
+## back into the run.
+func show_victory(text: String) -> void:
+	over_panel.add_theme_stylebox_override("panel",
+			_sb(Color("121a26"), Color("ffd54f"), 10))
+	lbl_over_title.text = "Map cleared"
+	lbl_over_title.add_theme_color_override("font_color", Color("ffd54f"))
+	lbl_over.text = text
+	btn_continue.visible = true
+	over_root.visible = true
+
+
+func hide_victory() -> void:
+	over_root.visible = false
+	btn_continue.visible = false
+	over_panel.add_theme_stylebox_override("panel",
+			_sb(Color("121a26"), Color("ef5350"), 10))
+	lbl_over_title.text = "The base has fallen"
+	lbl_over_title.add_theme_color_override("font_color", Color("ef5350"))
 
 
 func _build_topbar(root: Control) -> void:
@@ -506,10 +529,11 @@ func _build_game_over(root: Control) -> void:
 	panel.anchor_right = 0.5
 	panel.anchor_top = 0.5
 	panel.anchor_bottom = 0.5
-	panel.offset_left = -250.0
-	panel.offset_right = 250.0
-	panel.offset_top = -125.0
-	panel.offset_bottom = 125.0
+	panel.offset_left = -300.0
+	panel.offset_right = 300.0
+	panel.offset_top = -150.0
+	panel.offset_bottom = 150.0
+	over_panel = panel
 	panel.add_theme_stylebox_override("panel", _sb(Color("121a26"), Color("ef5350"), 10))
 	over_root.add_child(panel)
 
@@ -525,7 +549,14 @@ func _build_game_over(root: Control) -> void:
 
 	lbl_over = _label("", 15, Color(1, 1, 1, 0.85))
 	lbl_over.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl_over.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lbl_over.custom_minimum_size = Vector2(560.0, 0.0)
 	col.add_child(lbl_over)
+
+	btn_continue = _button("Keep playing — endless", 15, Vector2(0.0, 38.0))
+	btn_continue.pressed.connect(game.continue_endless)
+	btn_continue.visible = false
+	col.add_child(btn_continue)
 
 	var again := _button("Play again  (%s)" % Progress.key_name("restart"), 16,
 			Vector2(0.0, 42.0))
@@ -549,7 +580,10 @@ func update() -> void:
 		return
 	lbl_lives.text = "Lives %d" % game.lives
 	lbl_gold.text = "Gold $%d" % game.gold
-	lbl_wave.text = "Wave %d" % maxi(1, game.wave)
+	# The finish line, so a run has a shape rather than going on forever.
+	var target := TDData.clear_wave(game.level_def)
+	lbl_wave.text = "Wave %d / %d" % [maxi(1, game.wave), target] \
+			if not game.map_cleared else "Wave %d  (cleared)" % maxi(1, game.wave)
 	# Banked coins plus what the run would pay out if it ended now.
 	var pending := 0
 	if not game.rewarded and game.wave > 1:
