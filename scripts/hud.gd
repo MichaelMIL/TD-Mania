@@ -731,8 +731,12 @@ func refresh_info(hovered_type: String = "") -> void:
 		return
 
 	info_title.text = str(game.level_def["name"])
+	var weather: Dictionary = TDData.hazard_of(game.level_def)
+	var blurb_text: String = str(game.level_def["blurb"])
+	if not weather.is_empty():
+		blurb_text += "   ⚠ %s: %s" % [weather["name"], weather["note"]]
 	info_body.text = "%s\n%s\nDrag a tower onto the map. %s upgrades, %s sells, %s starts a wave early. %s auto, %s target, %s pause, %s speed, %s menu." \
-			% [game.level_def["blurb"], "    ".join(game.objective_lines(true)),
+			% [blurb_text, "    ".join(game.objective_lines(true)),
 			Progress.key_name("upgrade"), Progress.key_name("sell"),
 			Progress.key_name("start_wave"), Progress.key_name("auto"),
 			Progress.key_name("target"), Progress.key_name("pause"),
@@ -908,11 +912,13 @@ func _track_explanation(type_id: String, track: int, tower: Tower) -> String:
 ## Concrete stat changes from buying one rank, measured by comparing a scratch
 ## copy of the tower rather than restating the data table.
 func _rank_deltas(type_id: String, track: int, tower: Tower) -> String:
+	# Scratch copies belong to the match, not to the HUD: they have to see
+	# the same auras, tech and map hazard the real tower would.
 	var before := Tower.new()
-	before.game = self
+	before.game = game
 	before.setup(type_id, Vector2i.ZERO)
 	var after := Tower.new()
-	after.game = self
+	after.game = game
 	after.setup(type_id, Vector2i.ZERO)
 	if tower != null:
 		before.ranks = tower.ranks.duplicate()

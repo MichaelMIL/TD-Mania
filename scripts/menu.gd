@@ -371,7 +371,10 @@ func _level_card(index: int) -> Control:
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(text)
 
-	var blurb := _label(str(d["blurb"]), 12, Color(1, 1, 1, 0.62))
+	var weather: Dictionary = TDData.hazard_of(d)
+	var blurb := _label(str(d["blurb"]) + ("" if weather.is_empty()
+			else "\n⚠ %s — %s" % [weather["name"], weather["note"]]),
+			12, Color(1, 1, 1, 0.62))
 	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	blurb.custom_minimum_size = Vector2(148.0, 34.0)
 	text.add_child(blurb)

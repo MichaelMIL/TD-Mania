@@ -461,6 +461,18 @@ Flamethrower) cannot, and neither can their splash — a shell that lands under
 a Drake does nothing to it. The palette says "ground only" for those, so an
 air wave forces a mixed defence rather than more of the same tower.
 
+### Map hazards
+
+Eight of the thirty maps run under a weather rule that bends one thing
+about how towers work: **Fog** (every tower sees 12% less far), **Ashfall**
+(burning damage halved), **Gale** (a crosswind pushes aircraft off their
+runs) and **Brine** (water towers hit 15% harder, everything on dry ground
+6% softer).
+
+They are named and explained on the level card and on the in-match info
+panel, because a hazard you discover by losing is an ambush. `TDData.HAZARDS`
+holds them; `game.hazard_mult()` is what the towers ask.
+
 ### Bosses
 
 The two heavies do something rather than only being large. Every nine

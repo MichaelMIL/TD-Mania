@@ -102,6 +102,15 @@ func stat(key: String) -> float:
 		value *= Progress.bonus_mult("rate_mult")
 	elif key == "range":
 		value *= Progress.bonus_mult("range_mult")
+	# The map itself can bend these: fog shortens sight, brine favours the
+	# water towers over the ones standing on dry ground.
+	if game != null and is_instance_valid(game):
+		if key == "range":
+			value *= game.hazard_mult("range_mult")
+		elif key == "damage":
+			value *= game.hazard_mult("water_damage_mult" \
+					if int(def()["terrain"]) == TDData.Terrain.WATER
+					else "ground_damage_mult")
 	return value
 
 
@@ -126,7 +135,10 @@ func slow_duration() -> float:
 
 
 func burn() -> float:
-	return float(def().get("burn", 0.0)) + float(mods().get("burn_add", 0.0))
+	var value := float(def().get("burn", 0.0)) + float(mods().get("burn_add", 0.0))
+	if game != null and is_instance_valid(game):
+		value *= game.hazard_mult("burn_mult")
+	return value
 
 
 func shots() -> int:

@@ -265,6 +265,40 @@ static func wave_rule_active(rule: Dictionary, n: int) -> bool:
 	return every <= 1 or n % every == int(rule.get("offset", 0))
 
 
+## ---------------------------------------------------------------- hazards
+##
+## A map-wide rule that bends one thing about how towers work. Most maps
+## have none; the ones that do say so on the card and in the info panel,
+## because a hazard you find out about by losing is an ambush.
+static var HAZARDS: Dictionary = {
+	"fog": {
+		"name": "Fog", "range_mult": 0.88, "burn_mult": 1.0,
+		"water_damage_mult": 1.0, "ground_damage_mult": 1.0, "air_drift": 0.0,
+		"note": "Standing fog: every tower sees 12% less far.",
+	},
+	"ash": {
+		"name": "Ashfall", "range_mult": 1.0, "burn_mult": 0.5,
+		"water_damage_mult": 1.0, "ground_damage_mult": 1.0, "air_drift": 0.0,
+		"note": "Ash smothers flame: burning damage is halved here.",
+	},
+	"gale": {
+		"name": "Gale", "range_mult": 1.0, "burn_mult": 1.0,
+		"water_damage_mult": 1.0, "ground_damage_mult": 1.0, "air_drift": 34.0,
+		"note": "A crosswind pushes aircraft off their runs.",
+	},
+	"brine": {
+		"name": "Brine", "range_mult": 1.0, "burn_mult": 1.0,
+		"water_damage_mult": 1.15, "ground_damage_mult": 0.94, "air_drift": 0.0,
+		"note": "Salt air: water towers hit 15% harder, everything else 6% softer.",
+	},
+}
+
+
+## The hazard a map runs under, or an empty dictionary for most of them.
+static func hazard_of(level: Dictionary) -> Dictionary:
+	return HAZARDS.get(str(level.get("hazard", "")), {})
+
+
 ## ------------------------------------------------------------- objectives
 ##
 ## Three per map, worth a star each. Two come from the tier — get deep, and
@@ -563,6 +597,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "ashen",
+		"hazard": "ash",
 		"goal": {"kind": "few_towers", "n": 10, "towers": 14},
 		"unlock_level": 9,
 		"area": "wastes",
@@ -648,6 +683,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "delta",
+		"hazard": "brine",
 		"goal": {"kind": "few_towers", "n": 8, "towers": 10},
 		"unlock_level": 14,
 		"area": "delta",
@@ -704,6 +740,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "coast",
+		"hazard": "gale",
 		"goal": {"kind": "no_sell", "n": 12},
 		"unlock_level": 11,
 		"area": "frozen",
@@ -822,6 +859,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "fernhollow",
+		"hazard": "fog",
 		"goal": {"kind": "kills", "n": 300},
 		"area": "greenlands",
 		"unlock_level": 5,
@@ -852,6 +890,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "saltmarsh",
+		"hazard": "brine",
 		"goal": {"kind": "no_sell", "n": 10},
 		"area": "riverlands",
 		"unlock_level": 9,
@@ -1090,6 +1129,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "quarry",
+		"hazard": "ash",
 		"goal": {"kind": "no_water", "n": 9},
 		"area": "wastes",
 		"unlock_level": 11,
@@ -1120,6 +1160,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "glassflats",
+		"hazard": "fog",
 		"goal": {"kind": "kills", "n": 420},
 		"area": "wastes",
 		"unlock_level": 13,
@@ -1149,6 +1190,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "floes",
+		"hazard": "gale",
 		"goal": {"kind": "no_sell", "n": 9},
 		"area": "frozen",
 		"unlock_level": 10,

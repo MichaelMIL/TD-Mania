@@ -11,6 +11,13 @@ const BREAK_TIME := 16.0
 ## Speeds this run may use. Everyone has 1x; the rest are unlocked by the
 ## "tempo" doctrine, so fast-forward is earned rather than assumed.
 var speeds: Array = [1.0]
+## The map's hazard, if it has one. Empty on most maps.
+var hazard: Dictionary = {}
+
+
+## A hazard multiplier, or 1.0 where the map has no hazard.
+func hazard_mult(key: String) -> float:
+	return float(hazard.get(key, 1.0))
 const MENU_SCENE := "res://menu.tscn"
 
 var level_def: Dictionary = {}
@@ -127,6 +134,8 @@ func _ready() -> void:
 	_build_terrain()
 	_build_world()
 	speeds = Progress.speeds()
+	# One map-wide rule, read once: towers and aircraft ask the game for it.
+	hazard = TDData.hazard_of(level_def)
 	if TDData.resume_run:
 		_restore_run(Progress.run_for(str(level_def["id"])))
 	TDData.resume_run = false

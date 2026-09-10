@@ -212,6 +212,7 @@ func _ready() -> void:
 	_check_wave_rules()
 	_check_wave_affixes()
 	_check_boss_abilities()
+	_check_hazards()
 	_check_flyers()
 	_check_board_tooltips()
 	_check_objectives()
@@ -2288,6 +2289,68 @@ func _road_length(points: PackedVector2Array) -> float:
 
 
 
+
+
+
+
+## Map hazards: one map-wide rule, said out loud.
+func _check_hazards() -> void:
+	var described := true
+	for id: String in TDData.HAZARDS:
+		var hz: Dictionary = TDData.HAZARDS[id]
+		if str(hz.get("name", "")) == "" or str(hz.get("note", "")).length() < 20:
+			described = false
+	check("every hazard explains itself", described)
+	var with_hazard: Array = []
+	var areas: Array = []
+	for level: Dictionary in TDData.LEVELS:
+		if TDData.hazard_of(level).is_empty():
+			continue
+		with_hazard.append(str(level["id"]))
+		if not areas.has(str(level["area"])):
+			areas.append(str(level["area"]))
+	check("some maps have one, most do not (%d of %d)"
+			% [with_hazard.size(), TDData.LEVELS.size()],
+			with_hazard.size() >= 4 and with_hazard.size() <= TDData.LEVELS.size() / 2)
+	check("and they are spread across the areas (%d)" % areas.size(), areas.size() >= 3)
+	var unknown: Array = []
+	for level: Dictionary in TDData.LEVELS:
+		var id := str(level.get("hazard", ""))
+		if id != "" and not TDData.HAZARDS.has(id):
+			unknown.append(str(level["id"]))
+	check("no map names a hazard that does not exist (%s)" % ", ".join(unknown),
+			unknown.is_empty())
+
+	# The rule has to reach the towers.
+	var saved_hazard: Dictionary = game.hazard
+	var probe := Tower.new()
+	probe.game = game
+	probe.setup("gun", Vector2i.ZERO)
+	game.hazard = {}
+	var clear_range := probe.stat("range")
+	game.hazard = TDData.HAZARDS["fog"]
+	check("fog shortens every tower's reach", probe.stat("range") < clear_range)
+	game.hazard = TDData.HAZARDS["ash"]
+	var flamer := Tower.new()
+	flamer.game = game
+	flamer.setup("flame", Vector2i.ZERO)
+	var ashed := flamer.burn()
+	game.hazard = {}
+	check("ashfall halves burning damage", ashed < flamer.burn())
+	game.hazard = TDData.HAZARDS["brine"]
+	var tide := Tower.new()
+	tide.game = game
+	tide.setup("tide", Vector2i.ZERO)
+	var brined_water := tide.stat("damage")
+	var brined_ground := probe.stat("damage")
+	game.hazard = {}
+	check("brine favours the water towers",
+			brined_water > tide.stat("damage") and brined_ground < probe.stat("damage"))
+	check("and a map without a hazard changes nothing",
+			is_equal_approx(probe.stat("range"), clear_range))
+	for t in [probe, flamer, tide]:
+		t.free()
+	game.hazard = saved_hazard
 
 
 ## Bosses do something rather than only being large.

@@ -77,6 +77,17 @@ func _reacquire() -> void:
 		target = game.find_target(pad, op_range, 0.0, target_mode)
 
 
+## A crosswind on some maps: aircraft are pushed sideways as they fly, so
+## a bombing run drifts off the road unless the pad sits close to it.
+func _drift(delta: float) -> Vector2:
+	if game == null or not is_instance_valid(game):
+		return Vector2.ZERO
+	var push := float(game.hazard.get("air_drift", 0.0))
+	if is_zero_approx(push):
+		return Vector2.ZERO
+	return Vector2(0.0, push) * delta
+
+
 func _fly_to(point: Vector2, delta: float) -> float:
 	var to_point := point - position
 	var dist := to_point.length()
@@ -87,7 +98,7 @@ func _fly_to(point: Vector2, delta: float) -> float:
 	# bigger than the arrival threshold orbits its target forever.
 	var turn := 3.2 if dist > speed * 0.5 else 14.0
 	heading = lerp_angle(heading, want, minf(1.0, delta * turn))
-	position += Vector2.RIGHT.rotated(heading) * speed * delta
+	position += Vector2.RIGHT.rotated(heading) * speed * delta + _drift(delta)
 	rotation = heading
 	return dist
 
