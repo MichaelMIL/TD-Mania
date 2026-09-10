@@ -12,16 +12,13 @@ harnesses.
 
 ## Do these first
 
-- [ ] **A first run that teaches itself.** The game now has towers, ranks,
-      coins, tech, objectives, targeting modes, flyers, water, aircraft and
-      auras — and it explains none of it until you already know where to
-      look. Verdant Pass should run a scripted first three waves: place
-      this here, watch it shoot, this is what a rank does, this is what got
-      through and why. Gate it on `Progress.stat_int("runs") == 0` with a
-      skip button. Touches `game.gd` (a small script runner), `hud.gd` (a
-      pointer and a caption) and `progress.gd` (a "seen it" flag).
-      *The biggest gap between the game being good and being playable by
-      someone who is not you.*
+- [x] **A first run that teaches itself.** *Implemented 2026-09-11.*
+      `scripts/tutorial.gd`: eight lines in a banner under the top bar,
+      each waiting for the player to place a tower, call a wave, spend the
+      gold, click a tower — rather than for a timer. Runs once on an
+      account with no runs, never on a resumed one, skippable, and every
+      step is a condition on the match itself so it cannot disagree with
+      the game.
 - [ ] **Anyone else can play it.** There is no export preset, so the game
       runs from the CLI or the editor and nowhere else. Add a web export
       plus a GitHub Actions workflow running `dev/run_checks.sh` on push,

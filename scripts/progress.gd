@@ -322,6 +322,7 @@ static func apply_config(cfg: ConfigFile) -> void:
 	options["window_scale"] = float(cfg.get_value("options", "window_scale", 1.0))
 	options["frame_cap"] = int(cfg.get_value("options", "frame_cap", 60))
 	options["colourblind"] = bool(cfg.get_value("options", "colourblind", false))
+	options["tutorial_done"] = bool(cfg.get_value("options", "tutorial_done", false))
 
 
 static func save_state() -> void:
@@ -350,6 +351,8 @@ static func save_state() -> void:
 	cfg.set_value("options", "window_scale", window_scale())
 	cfg.set_value("options", "frame_cap", frame_cap())
 	cfg.set_value("options", "colourblind", colourblind())
+	cfg.set_value("options", "tutorial_done",
+			bool(options.get("tutorial_done", false)))
 	for key: String in runs:
 		cfg.set_value("runs", key, runs[key])
 	write_config(cfg, slot_path(slot))

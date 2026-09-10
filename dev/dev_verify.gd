@@ -217,6 +217,7 @@ func _ready() -> void:
 	_check_colour_access()
 	_check_run_seed()
 	_check_save_safety()
+	_check_tutorial()
 	_check_modifiers()
 	_check_flyers()
 	_check_board_tooltips()
@@ -2387,6 +2388,67 @@ func _check_modifiers() -> void:
 
 
 
+
+
+
+
+## The first run teaches itself: a line at a time, each waiting for the
+## player to do the thing rather than for a clock.
+func _check_tutorial() -> void:
+	Progress.use_clean_state()
+	Progress.read_only = true
+	Progress.stats = {}
+	Progress.options.erase("tutorial_done")
+	check("a brand new account is shown the ropes", Tutorial.wanted())
+	Progress.stats = {"runs": 3}
+	check("someone who has played is not", not Tutorial.wanted())
+	Progress.stats = {}
+	Tutorial.mark_seen()
+	check("and neither is someone who has already seen it", not Tutorial.wanted())
+	Progress.options.erase("tutorial_done")
+
+	var walk := Tutorial.new()
+	walk.game = game
+	add_child(walk)
+	check("it has something to say", walk.steps.size() >= 6)
+	var vague := ""
+	for step: Dictionary in walk.steps:
+		if str(step["text"]).length() < 40:
+			vague = str(step["text"])
+		if not step.has("until") and not step.has("wait"):
+			vague = "a step that never ends"
+	check("every step says something and can be got past (%s)" % vague,
+			vague == "")
+
+	# A step that waits for the player does not move on by itself.
+	var saved_towers: Dictionary = game.occupied.duplicate()
+	game.occupied = {}
+	walk.index = 1
+	walk._show_step()
+	for i in 20:
+		walk._process(0.5)
+	check("a step waiting on the player stays put", walk.index == 1)
+	game.occupied = {Vector2i(0, 0): null}
+	walk._process(0.1)
+	check("and moves on the moment they do it", walk.index == 2)
+	game.occupied = saved_towers
+
+	# A step that only asks to be read moves on by itself.
+	walk.index = 0
+	walk._show_step()
+	walk._process(0.1)
+	check("a step that only wants reading waits a beat", walk.index == 0)
+	for i in 12:
+		walk._process(0.5)
+	check("then moves on", walk.index >= 1)
+
+	# Skipping is final.
+	walk._skip()
+	check("skipping ends it", not walk.visible)
+	check("and it does not come back", not Tutorial.wanted())
+	remove_child(walk)
+	walk.queue_free()
+	Progress.use_clean_state()
 
 
 ## Saves survive being interrupted: a write lands whole or not at all, and

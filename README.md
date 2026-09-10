@@ -202,6 +202,20 @@ The menu's account strip is two rows for the same reason: level and XP
 progress on top, then what the account owns (coins, stars, maps cleared)
 with the way into slots, options, stats and the tech tree on the right.
 
+### The first run
+
+A brand new account is walked through its first match: eight lines, one at
+a time, in a banner under the top bar with a Skip button. Every step that
+asks for something waits for the player to actually do it — place a tower,
+call the wave in, spend the gold it earned, click a tower to see its ranks
+— rather than for a timer, so it cannot get ahead of them. Steps that only
+want reading move on by themselves.
+
+It runs once (`Tutorial.wanted()` checks the account has no runs and has
+not skipped it), never on a resumed run, and every step is a condition on
+the match itself, so the walkthrough has no state of its own to disagree
+with the game about.
+
 ## How to play
 
 | Input | Action |

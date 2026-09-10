@@ -117,6 +117,7 @@ var cheats_used: bool = false
 var cheats: Cheats
 var tuning_panel: TuningPanel
 var pause_menu: PauseMenu
+var tutorial: Tutorial
 ## Every widget lives on this; see hud.gd.
 var hud: GameHUD
 
@@ -167,6 +168,11 @@ func _ready() -> void:
 	pause_menu = PauseMenu.new()
 	pause_menu.game = self
 	overlay.add_child(pause_menu)
+	# A brand new account is walked through its first run once.
+	if Tutorial.wanted() and not TDData.resume_run:
+		tutorial = Tutorial.new()
+		tutorial.game = self
+		overlay.add_child(tutorial)
 	if Cheats.available():
 		Cheats.reset_toggles()
 		cheats = Cheats.new()
