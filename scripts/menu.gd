@@ -390,7 +390,11 @@ func _level_card(index: int) -> Control:
 	var parked: Dictionary = Progress.run_for(str(d["id"]))
 	var status := "Best: wave %d" % record if record > 0 else "Not played yet"
 	if Progress.is_cleared(str(d["id"])):
-		status = "CLEARED · %s" % status
+		# Once a map is beaten, how far past the finish line matters more
+		# than the wave number on its own.
+		var past := Progress.endless_best(str(d["id"]))
+		status = "CLEARED · %s" % ("endless: %d past the finish" % past if past > 0
+				else "no endless run yet")
 	if not unlocked:
 		status = "Locked"
 	elif not parked.is_empty():

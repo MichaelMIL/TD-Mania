@@ -698,6 +698,19 @@ static func speeds() -> Array:
 	return out
 
 
+## How far past a map's finish line the best run went. Zero until a map is
+## cleared, so endless depth reads as its own achievement rather than being
+## folded into the best-wave record.
+static func endless_best(level_id: String) -> int:
+	load_state()
+	if not is_cleared(level_id):
+		return 0
+	for level: Dictionary in TDData.LEVELS:
+		if str(level["id"]) == level_id:
+			return maxi(0, best_wave(level_id) - TDData.clear_wave(level))
+	return 0
+
+
 static func best_wave(level_id: String) -> int:
 	load_state()
 	return int(bests.get(level_id, 0))

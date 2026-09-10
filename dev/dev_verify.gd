@@ -1915,6 +1915,22 @@ func _check_victory() -> void:
 			is_equal_approx(TDData.level_stat(TDData.LEVELS[0], "gold"),
 					float(TDData.tier_of(TDData.LEVELS[0])["gold"])))
 
+	# Endless depth is its own record, not folded into the best wave.
+	Progress.use_clean_state()
+	Progress.read_only = true
+	var first_level: Dictionary = TDData.LEVELS[0]
+	var finish := TDData.clear_wave(first_level)
+	Progress.record_wave(str(first_level["id"]), finish + 6)
+	check("an unbeaten map has no endless record",
+			Progress.endless_best(str(first_level["id"])) == 0)
+	Progress.record_clear(str(first_level["id"]), finish)
+	check("once cleared, endless counts the waves past the finish",
+			Progress.endless_best(str(first_level["id"])) == 6)
+	Progress.record_wave(str(first_level["id"]), finish)
+	check("and a shallower run does not lower it",
+			Progress.endless_best(str(first_level["id"])) == 6)
+	Progress.use_clean_state()
+
 	# Records: first clear is reported once, and depth is kept.
 	Progress.use_clean_state()
 	Progress.read_only = true

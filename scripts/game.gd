@@ -1070,6 +1070,11 @@ func _trigger_game_over() -> void:
 			occupied.size(), leaked_total,
 			"New record!" if record else "Best on this map: wave %d" % best_wave, payout,
 			objective_summary()]
+	# After a clear, the interesting number is how far past the finish the
+	# endless run went.
+	if map_cleared:
+		var past: int = maxi(0, reached - TDData.clear_wave(level_def))
+		hud.lbl_over.text += "\nCleared, then %d waves of endless." % past
 	var breached := leak_summary()
 	if breached != "":
 		hud.lbl_over.text += "\n" + breached
