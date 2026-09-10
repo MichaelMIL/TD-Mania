@@ -26,10 +26,13 @@ harnesses.
       then builds the web export and keeps it as an artifact. The web build
       was produced and checked locally; the workflow itself is unverified
       until GitHub runs it.
-- [ ] **Generate the art.** *Waiting on you.* `assets/PROMPTS.md` covers
-      every sprite the game looks for — including the ten new road surfaces
-      and decor motifs — and `scripts/art.gd` picks PNGs up off disk with no
-      reimport. One Gemini run and the whole game changes complexion.
+- [~] **Generate the art.** *Everything but the images is done; the run is
+      yours.* `assets/PROMPTS.md` carries a prompt for all 57 sprites the
+      game looks for, `scripts/art.gd` uses a PNG the moment it appears and
+      keeps drawing the rest by hand, and
+      `godot --headless --quit-after 100 dev/dev_art.tscn` says how far
+      along you are ("12 of 57 sprites in place"). Drop them in a few at a
+      time; nothing needs reimporting and nothing breaks half-way.
 
 ## Depth
 

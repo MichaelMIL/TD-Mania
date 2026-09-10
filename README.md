@@ -634,6 +634,14 @@ these names, with a shared style line so the set comes out consistent. The
 verify suite fails if a tower or creep is ever added without a matching
 prompt, so the sheet cannot drift behind the game.
 
+Drop files in a few at a time — the game uses a PNG the moment it exists
+and keeps drawing the rest by hand — and ask where you are up to:
+
+```bash
+godot --headless --quit-after 100 dev/dev_art.tscn
+# [ART] 12 of 57 sprites in place (21%), plus 3 per-level variants
+```
+
 All drawing falls back to vector primitives, but `scripts/art.gd` checks
 `assets/` first for a matching `.png`, `.webp`, or `.jpg` and uses it instead.
 Images are loaded straight off disk, so adding files needs no reimport — just
