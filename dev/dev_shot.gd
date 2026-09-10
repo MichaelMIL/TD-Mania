@@ -43,6 +43,14 @@ func _ready() -> void:
 		if args[i] == "--delay" and i + 1 < args.size():
 			delay = float(args[i + 1])
 	await get_tree().create_timer(delay).timeout
+	if args.has("--hover") and not game.enemies.is_empty():
+		# Park the pointer on a creep so its card is in the frame.
+		var creep: Enemy = game.enemies[0]
+		Input.warp_mouse(creep.position - Vector2(0.0, creep.radius * 1.15
+				if creep.flying else 0.0))
+		await get_tree().process_frame
+		game._refresh_creep_tip()
+		await get_tree().process_frame
 	RenderingServer.frame_post_draw.connect(_grab, CONNECT_ONE_SHOT)
 
 

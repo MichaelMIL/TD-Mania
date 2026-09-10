@@ -344,6 +344,14 @@ then an outer ring as the total investment rises.
 | Helipad | Autocannon (4), Ammo Belts (3), Uprated Rotors (3), Wing Escort (1) | — |
 | Command Post | Doctrine (3), Logistics (3), Comms Array (3) | — |
 
+### Reading the board
+
+Hovering any creep shows a card beside the cursor: what it is, how much
+health is left, its armour and speed, and the traits that decide the answer
+to it — flying, immune to slows or fire, heals its neighbours, steals gold,
+splits, sprints in bursts, costs several lives — followed by the roster note.
+It follows the creep, so a wave can be inspected while it walks.
+
 ### Flyers
 
 Two creeps ignore the road entirely and fly straight from the spawn portal to

@@ -100,8 +100,14 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
 - [ ] **Generate the art.** `assets/PROMPTS.md` is written and the loader in
       `scripts/art.gd` picks files up with no reimport; dropping in real
       sprites is a one-evening visual overhaul.
-- [ ] **Board tooltips.** Hovering a creep to see its armour, immunities and
-      speed would teach the roster without a wiki.
+- [x] **Board tooltips.** *Implemented 2026-09-10.* Hovering a creep pops a
+      card by the cursor: name, current and maximum health, armour, speed,
+      and every trait that decides how to answer it — flying, slow- or
+      fire-immune, heals, steals, splits, sprints, or costs more than one
+      life — plus the roster note. `enemy_at()` picks what is under the
+      pointer (aiming at where a flyer is drawn, not its shadow) and the
+      card is re-checked every frame, since creeps walk out from under a
+      still cursor.
 
 ## Do last
 

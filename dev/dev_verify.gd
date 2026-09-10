@@ -211,6 +211,7 @@ func _ready() -> void:
 	_check_save_versioning()
 	_check_wave_rules()
 	_check_flyers()
+	_check_board_tooltips()
 	_check_enemy_kinds()
 	_check_cheats()
 	_check_audio()
@@ -1501,6 +1502,65 @@ func _check_targeting() -> void:
 
 
 
+
+
+
+
+## Hovering a creep has to teach the roster: what it is, what it shrugs off,
+## and how to answer it.
+func _check_board_tooltips() -> void:
+	var saved: Array = game.enemies.duplicate()
+	game.enemies.clear()
+	game.invalidate_targeting_grid()
+	var warden := Enemy.new()
+	warden.setup("warden", 1.0, 1.0, game.routes[0])
+	warden.position = Vector2(500.0, 300.0)
+	warden.hp = warden.max_hp * 0.5
+	add_child(warden)
+	game.enemies.append(warden)
+	game.invalidate_targeting_grid()
+
+	check("the cursor finds the creep under it",
+			game.enemy_at(warden.position) == warden)
+	check("and finds nothing where there is none",
+			game.enemy_at(warden.position + Vector2(300.0, 0.0)) == null)
+
+	var card: String = game.describe_enemy(warden)
+	check("the card names the creep", card.contains(warden.display_name))
+	check("and shows how much of it is left",
+			card.contains("%d" % int(round(warden.max_hp))))
+	check("armour is spelled out, since it decides the answer",
+			card.contains("armour") == (warden.armor > 0.0))
+	var mender := Enemy.new()
+	mender.setup("mender", 1.0, 1.0, game.routes[0])
+	check("a healer says so", str(game.describe_enemy(mender)).contains("heals"))
+	var ash := Enemy.new()
+	ash.setup("ashwalker", 1.0, 1.0, game.routes[0])
+	check("and a fireproof creep says so",
+			str(game.describe_enemy(ash)).contains("ignores fire"))
+	var flyer := Enemy.new()
+	flyer.setup("drake", 1.0, 1.0, game.routes[0])
+	check("a flyer says it flies", str(game.describe_enemy(flyer)).contains("flying"))
+	var thief := Enemy.new()
+	thief.setup("thief", 1.0, 1.0, game.routes[0])
+	check("and a thief says what it takes",
+			str(game.describe_enemy(thief)).contains("steals"))
+	# Every roster entry must produce a card without erroring.
+	var blank := ""
+	for kind: String in TDData.ENEMIES:
+		var probe := Enemy.new()
+		probe.setup(kind, 1.0, 1.0, game.routes[0])
+		if str(game.describe_enemy(probe)).strip_edges() == "":
+			blank = kind
+		probe.free()
+	check("every creep in the roster has a card (%s)" % blank, blank == "")
+
+	for e in [mender, ash, flyer, thief]:
+		e.free()
+	game.enemies.erase(warden)
+	warden.queue_free()
+	game.enemies.assign(saved)
+	game.invalidate_targeting_grid()
 
 
 ## Flyers ignore the road and only half the roster can shoot at them.

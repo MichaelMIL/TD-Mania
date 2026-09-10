@@ -78,6 +78,8 @@ var info_hover: Label
 var track_buttons: Array = []
 var palette_cards: Dictionary = {}
 var palette_costs: Dictionary = {}
+var creep_tip: PanelContainer
+var creep_tip_label: Label
 var lbl_level: Label
 var lbl_lives: Label
 var lbl_gold: Label
@@ -289,6 +291,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		hover_cell = world_to_cell(get_global_mouse_position())
 		cursor.queue_redraw()
+		_refresh_creep_tip()
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
 			and not event.pressed:
@@ -320,6 +323,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if c != hover_cell:
 			hover_cell = c
 			cursor.queue_redraw()
+		_refresh_creep_tip()
 		return
 	if event is InputEventMouseButton and event.pressed:
 		if game_over:
@@ -549,6 +553,9 @@ func _process(delta: float) -> void:
 		elif break_timer <= 0.0:
 			_start_wave()
 	_update_hud()
+	# Creeps walk out from under a still cursor, so the card is re-checked
+	# every frame rather than only on mouse movement.
+	_refresh_creep_tip()
 
 
 ## Menders top up wounded neighbours, which is what makes burst damage and
@@ -1239,7 +1246,87 @@ func _build_ui() -> void:
 	_build_palette(root)
 	_build_info_bar(root)
 	_build_status_label(root)
+	_build_creep_tip(root)
 	_build_game_over(root)
+
+
+## A card that follows the cursor over a creep. Reading the roster off the
+## board beats keeping a wiki open.
+func _build_creep_tip(root: Control) -> void:
+	creep_tip = PanelContainer.new()
+	creep_tip.add_theme_stylebox_override("panel",
+			_sb(Color(0.04, 0.06, 0.09, 0.94), Color("546e7a"), 6))
+	creep_tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	creep_tip.visible = false
+	creep_tip_label = _label("", 12, Color("e3f2fd"))
+	creep_tip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	creep_tip.add_child(creep_tip_label)
+	root.add_child(creep_tip)
+
+
+## The creep under a point, if the cursor is actually on one.
+func enemy_at(pos: Vector2) -> Enemy:
+	var best: Enemy = null
+	var best_dist := INF
+	for e: Enemy in enemies_near(pos, 8.0):
+		var reach: float = e.radius + 6.0
+		# Flyers sit above their shadow, so aim at where they are drawn.
+		var centre: Vector2 = e.position - Vector2(0.0, e.radius * 1.15 if e.flying else 0.0)
+		var dist := centre.distance_to(pos)
+		if dist <= reach and dist < best_dist:
+			best_dist = dist
+			best = e
+	return best
+
+
+## What a creep is, in one card: health, what it shrugs off, and the note
+## that says how to answer it.
+static func describe_enemy(e: Enemy) -> String:
+	var d: Dictionary = TDData.ENEMIES.get(e.kind, {})
+	var text := "%s   %d / %d hp" % [e.display_name, int(ceil(e.hp)), int(round(e.max_hp))]
+	var traits: Array = []
+	if e.armor > 0.0:
+		traits.append("armour %d" % int(round(e.armor)))
+	traits.append("%d px/s" % int(round(e.base_speed)))
+	if e.flying:
+		traits.append("flying")
+	if e.slow_immune:
+		traits.append("ignores slows")
+	if e.burn_immune:
+		traits.append("ignores fire")
+	if e.heal > 0.0:
+		traits.append("heals nearby")
+	if e.steal_gold > 0:
+		traits.append("steals $%d" % e.steal_gold)
+	if e.split_count > 0:
+		traits.append("splits into %d" % e.split_count)
+	if e.charge_period > 0.0:
+		traits.append("sprints in bursts")
+	if e.leak_damage > 1:
+		traits.append("costs %d lives" % e.leak_damage)
+	text += "\n" + "  ·  ".join(traits)
+	var note := str(d.get("note", ""))
+	if note != "":
+		text += "\n" + note
+	return text
+
+
+func _refresh_creep_tip() -> void:
+	if creep_tip == null:
+		return
+	var pos := get_global_mouse_position()
+	var over: Enemy = null if not map_rect().has_point(pos) else enemy_at(pos)
+	if over == null:
+		creep_tip.visible = false
+		return
+	creep_tip_label.text = describe_enemy(over)
+	creep_tip.visible = true
+	# Keep the card on screen, and out from under the cursor.
+	var wanted := pos + Vector2(18.0, 18.0)
+	var card := creep_tip.get_combined_minimum_size()
+	wanted.x = minf(wanted.x, float(TDData.MAP_W) - card.x - 8.0)
+	wanted.y = minf(wanted.y, float(TDData.MAP_H) - card.y - 8.0)
+	creep_tip.position = wanted
 
 
 func _build_topbar(root: Control) -> void:
