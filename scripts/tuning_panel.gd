@@ -32,7 +32,8 @@ var current: String = "gun"
 ## -1 edits the global layer; otherwise the id of the level being played.
 var scope_level: int = -1
 var tower_buttons: Dictionary = {}
-var value_labels: Dictionary = {}
+var value_fields: Dictionary = {}
+var delta_labels: Dictionary = {}
 
 
 static func available() -> bool:
@@ -223,20 +224,32 @@ func _short_label(subject: String) -> String:
 	return str(TDData.TOWERS[subject].get("short", TDData.TOWERS[subject]["name"]))
 
 
-## One stat: name, minus, value, plus, and a reset that drops the override.
+## One stat per line: what it is, an "i" that explains it, minus, a field
+## you can type into, plus, how far it has drifted, and a reset. Rows are
+## grouped — the track as a whole first, then a block per rank.
 func _build_rows() -> void:
 	for child in rows_col.get_children():
 		rows_col.remove_child(child)
 		child.queue_free()
-	value_labels = {}
+	value_fields = {}
+	delta_labels = {}
+	var group := ""
 	for row: Dictionary in Tuning.rows_for(current):
 		var key := str(row["key"])
+		if str(row.get("group", "")) != group:
+			group = str(row.get("group", ""))
+			if group != "":
+				var header := _label(group, 11, Color("4dd0e1"))
+				header.custom_minimum_size = Vector2(0.0, 20.0)
+				rows_col.add_child(header)
 		var line := HBoxContainer.new()
 		line.add_theme_constant_override("separation", 4)
 		rows_col.add_child(line)
+
 		var name_label := _label(str(row["name"]), 13, Color(1, 1, 1, 0.75))
 		name_label.custom_minimum_size = Vector2(96.0, 0.0)
 		line.add_child(name_label)
+
 		# An "i" that explains the stat on hover, so tuning does not require
 		# knowing the codebase.
 		var info := Button.new()
@@ -249,42 +262,101 @@ func _build_rows() -> void:
 		info.mouse_filter = Control.MOUSE_FILTER_STOP
 		info.tooltip_text = str(row.get("info", str(row["name"])))
 		line.add_child(info)
+
 		var minus := _small_button("−", 30.0)
 		minus.pressed.connect(_nudge.bind(key, -1.0))
 		line.add_child(minus)
-		var value := _label("", 13, Color("ffd54f"))
-		value.custom_minimum_size = Vector2(120.0, 0.0)
-		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		line.add_child(value)
-		value_labels[key] = value
+
+		# Typed straight in when you know the number you want.
+		var field := LineEdit.new()
+		field.custom_minimum_size = Vector2(86.0, 26.0)
+		field.alignment = HORIZONTAL_ALIGNMENT_CENTER
+		field.add_theme_font_size_override("font_size", 13)
+		field.select_all_on_focus = true
+		field.text_submitted.connect(_typed.bind(key))
+		field.focus_exited.connect(_commit.bind(key))
+		line.add_child(field)
+		value_fields[key] = field
+
 		var plus := _small_button("+", 30.0)
 		plus.pressed.connect(_nudge.bind(key, 1.0))
 		line.add_child(plus)
+
+		var drift := _label("", 12, Color("ff8a65"))
+		drift.custom_minimum_size = Vector2(56.0, 0.0)
+		line.add_child(drift)
+		delta_labels[key] = drift
+
 		var reset := _small_button("reset", 58.0)
 		reset.pressed.connect(_reset_stat.bind(key))
 		line.add_child(reset)
 	_refresh_values()
 
 
+## Reads a typed number. Anything unparseable is simply ignored and the
+## field snaps back to what the value really is.
+func _typed(text: String, key: String) -> void:
+	var cleaned := text.strip_edges().replace(",", ".")
+	if cleaned == "" or not cleaned.is_valid_float():
+		_refresh_values()
+		return
+	var row := _row_for(key)
+	var value: float = clampf(cleaned.to_float(), float(row.get("min", -99999.0)),
+			float(row.get("max", 99999.0)))
+	Tuning.set_value(current, key, value, scope_level)
+	_after_change()
+	_say("%s %s = %s (%s)" % [Tuning.label_of(current), row.get("name", key),
+			_format(value, row), "all levels" if scope_level < 0 else level_name()])
+
+
+func _commit(key: String) -> void:
+	if value_fields.has(key):
+		_typed(str((value_fields[key] as LineEdit).text), key)
+
+
+## Some changes add or remove rows — giving a track more ranks gives it
+## more rank blocks — so the list is rebuilt when its shape moves.
+func _after_change() -> void:
+	if value_fields.size() != Tuning.rows_for(current).size():
+		_build_rows()
+	else:
+		_refresh_values()
+
+
+func _row_for(key: String) -> Dictionary:
+	for row: Dictionary in Tuning.rows_for(current):
+		if str(row["key"]) == key:
+			return row
+	return {}
+
+
+## Whole-numbered stats print whole: "Ranks 4", not "Ranks 4.00".
+func _format(value: float, row: Dictionary) -> String:
+	return "%.0f" % value if float(row.get("step", 1.0)) >= 1.0 else "%.2f" % value
+
+
 func _refresh_values() -> void:
 	var scope := scope_level
 	var base_table := Tuning.base_of(current)
-	var steps: Dictionary = {}
 	for row: Dictionary in Tuning.rows_for(current):
-		steps[str(row["key"])] = float(row["step"])
-	for key: String in value_labels:
+		var key := str(row["key"])
+		if not value_fields.has(key):
+			continue
+		var field: LineEdit = value_fields[key]
 		var base := float(base_table.get(key, 0.0))
 		var now := Tuning.value_of(current, key, level_id() if scope >= 0 else -1)
-		var label: Label = value_labels[key]
-		# Whole-numbered stats print whole: "Ranks 4", not "Ranks 4.00".
-		var text := "%.0f" % now if float(steps.get(key, 1.0)) >= 1.0 else "%.2f" % now
-		if not is_equal_approx(now, base):
-			var delta := (now / base - 1.0) * 100.0 if not is_zero_approx(base) else 0.0
-			text += "  (%+d%%)" % int(round(delta))
-			label.add_theme_color_override("font_color", Color("ff8a65"))
+		# Never fight the player for the field they are typing in.
+		if not field.has_focus():
+			field.text = _format(now, row)
+		var overridden := Tuning.is_overridden(current, key,
+				level_id() if scope >= 0 else -1)
+		field.add_theme_color_override("font_color",
+				Color("ff8a65") if overridden else Color("ffd54f"))
+		var drift: Label = delta_labels[key]
+		if is_equal_approx(now, base) or is_zero_approx(base):
+			drift.text = ""
 		else:
-			label.add_theme_color_override("font_color", Color("ffd54f"))
-		label.text = text
+			drift.text = "%+d%%" % int(round((now / base - 1.0) * 100.0))
 	scope_button.text = "Scope: %s" % ("all levels" if scope_level < 0
 			else "%s only" % level_name())
 	for subject: String in tower_buttons:
@@ -315,10 +387,7 @@ func _toggle_scope() -> void:
 ## A click moves the stat by its step; the value is clamped to something the
 ## game can still run with.
 func _nudge(key: String, direction: float) -> void:
-	var row: Dictionary = {}
-	for candidate: Dictionary in Tuning.rows_for(current):
-		if str(candidate["key"]) == key:
-			row = candidate
+	var row := _row_for(key)
 	if row.is_empty():
 		return
 	var scope := scope_level if scope_level >= 0 else -1
@@ -326,14 +395,14 @@ func _nudge(key: String, direction: float) -> void:
 	var next: float = clampf(now + direction * float(row["step"]),
 			float(row["min"]), float(row["max"]))
 	Tuning.set_value(current, key, next, scope)
-	_refresh_values()
-	_say("%s %s = %.2f (%s)" % [Tuning.label_of(current), row["name"], next,
-			"all levels" if scope < 0 else level_name()])
+	_after_change()
+	_say("%s %s = %s (%s)" % [Tuning.label_of(current), row["name"],
+			_format(next, row), "all levels" if scope < 0 else level_name()])
 
 
 func _reset_stat(key: String) -> void:
 	Tuning.clear_value(current, key, scope_level)
-	_refresh_values()
+	_after_change()
 	_say("%s back to the table value." % key)
 
 

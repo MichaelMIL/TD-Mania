@@ -7,6 +7,16 @@ extends Node
 ##   ... dev/dev_report.tscn -- --runs 5          # more samples per map
 ##   ... dev/dev_report.tscn -- --area wastes     # one area only
 ##
+## A run is one core for a few seconds, so a big sample is worth splitting
+## across processes. Each slice writes its results, and one last pass reads
+## them all and does the judging:
+##
+##   for k in 0 1 2 3; do
+##     godot --headless --fixed-fps 5 --quit-after 900000 dev/dev_report.tscn \
+##       -- --runs 5 --slice $k/4 --json /tmp/rep$k.json &
+##   done; wait
+##   godot --headless --quit-after 100 dev/dev_report.tscn -- --merge /tmp/rep*.json
+##
 ## `--fixed-fps 5` is what makes it quick and repeatable: every frame
 ## advances exactly 0.2 s of game time regardless of how fast the machine
 ## runs, so a run takes a predictable number of frames and the same seed
@@ -33,6 +43,12 @@ const FRAME_BUDGET := 20000
 
 var runs_per_map := 3
 var only_area := ""
+## "k/n": this process takes every nth map starting at k.
+var slice_index := 0
+var slice_count := 1
+## Where to write this process's results, and what to read back when merging.
+var json_out := ""
+var merge_paths: PackedStringArray = PackedStringArray()
 var levels: Array = []
 var queue: Array = []
 var results: Array = []
@@ -60,11 +76,31 @@ func _ready() -> void:
 			runs_per_map = int(args[i + 1])
 		if args[i] == "--area" and i + 1 < args.size():
 			only_area = args[i + 1]
+		if args[i] == "--json" and i + 1 < args.size():
+			json_out = args[i + 1]
+		if args[i] == "--slice" and i + 1 < args.size():
+			var parts := str(args[i + 1]).split("/")
+			slice_index = int(parts[0])
+			slice_count = maxi(1, int(parts[1]) if parts.size() > 1 else 1)
+		if args[i] == "--merge":
+			for j in range(i + 1, args.size()):
+				if str(args[j]).begins_with("--"):
+					break
+				merge_paths.append(args[j])
+	if not merge_paths.is_empty():
+		_merge()
+		return
+	var taken := 0
 	for i in TDData.LEVELS.size():
-		if only_area == "" or str(TDData.LEVELS[i].get("area", "")) == only_area:
-			levels.append(i)
-			for run in runs_per_map:
-				queue.append({"level": i, "seed": run})
+		if only_area != "" and str(TDData.LEVELS[i].get("area", "")) != only_area:
+			continue
+		if taken % slice_count != slice_index:
+			taken += 1
+			continue
+		taken += 1
+		levels.append(i)
+		for run in runs_per_map:
+			queue.append({"level": i, "seed": run})
 	# The App autoload caps the frame rate for the player's benefit; a batch
 	# of simulations wants none of that.
 	Engine.max_fps = 0
@@ -79,6 +115,8 @@ func _next() -> void:
 		game.queue_free()
 		game = null
 	if queue.is_empty():
+		if json_out != "":
+			_write_json()
 		_report()
 		return
 	current = queue.pop_front()
@@ -125,6 +163,34 @@ func _finish(died: bool) -> void:
 		"frames": frames,
 	})
 	_next()
+
+
+## Writes this slice's raw results so another process can judge them all
+## together.
+func _write_json() -> void:
+	var file := FileAccess.open(json_out, FileAccess.WRITE)
+	if file == null:
+		print("[REPORT] could not write %s" % json_out)
+		return
+	file.store_string(JSON.stringify(results))
+	file.close()
+	print("[REPORT] wrote %d runs to %s" % [results.size(), json_out])
+
+
+## Reads several slices back and reports on the lot.
+func _merge() -> void:
+	for path: String in merge_paths:
+		if not FileAccess.file_exists(path):
+			print("[REPORT] missing %s" % path)
+			continue
+		var parsed: Variant = JSON.parse_string(
+				FileAccess.get_file_as_string(path))
+		if parsed is Array:
+			for entry: Variant in parsed:
+				results.append(entry)
+	print("[REPORT] merged %d runs from %d files"
+			% [results.size(), merge_paths.size()])
+	_report()
 
 
 func _mean(list: Array) -> float:

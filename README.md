@@ -597,7 +597,20 @@ leaving them to be eyeballed:
 ```bash
 godot --headless --fixed-fps 5 --quit-after 900000 dev/dev_report.tscn -- --runs 2
 dev/run_checks.sh --full     # the same thing, after the fast harnesses
+
+# A bigger sample, split across cores: each slice writes its runs, and one
+# last pass reads them all and does the judging.
+for k in 0 1 2 3 4 5; do
+  godot --headless --fixed-fps 5 --quit-after 900000 dev/dev_report.tscn \
+    -- --runs 6 --slice $k/6 --json /tmp/rep$k.json &
+done; wait
+godot --headless --quit-after 100 dev/dev_report.tscn -- --merge /tmp/rep*.json
 ```
+
+At 120 runs the table barely moves from 40 — Easy 16.9, Normal 14.4, Hard
+12.2, Brutal 10.3 — which is the useful thing to know about the sample: two
+runs a map is already enough to see a real difference, and anything under
+about one wave is noise.
 
 `--fixed-fps 5` gives every frame exactly 0.2 s of game time, so a run takes
 a predictable number of frames and the same seed always plays out the same
@@ -648,10 +661,13 @@ editor, which covers three kinds of subject:
 
 - **Towers** — damage, fire rate, range, cost, splash, slow, knockback, shot
   speed, dead zone, income, aircraft, volley, chain, pierce.
-- **Upgrades** — every tower's tracks: how many ranks it has, what a rank
-  costs (`cost share`, which drives both the coin and the gold price), the
-  account level it unlocks at, and what a rank actually *does* — each
-  numeric modifier is its own row.
+- **Upgrades** — every tower's tracks, in two parts. *The whole track*:
+  how many ranks it has, the `cost share` that drives the price curve, the
+  account level it unlocks at, and what a rank does. Then *one block per
+  rank*: the coins that rank costs in the tech tree, the gold to install it
+  in a match, and its own copy of each modifier — so rank 3 can be made
+  expensive, or cheap, or twice as strong as ranks 1 and 2, without
+  touching the others. A rank left alone follows the curve.
 - **Enemies** — health, speed, armour, bounty, lives lost on a leak, size,
   and the trait numbers that decide how a kind must be answered: heal rate
   and range, gold stolen, how many it splits into, sprint timing.
@@ -663,8 +679,9 @@ is: a tower's blurb, a creep's note and traits, or an upgrade track spelled
 out in full ("4 ranks, each +22% damage. Last rank also: Sabot Rounds —
 rounds punch through armor").
 
-Pick a subject on the left, nudge with `−` / `+`, and the change takes
-effect immediately — towers and creeps re-read their numbers every frame,
+Pick a subject on the left, then either nudge with `−` / `+` or **type the
+number straight into the field** (out-of-range values are clamped, nonsense
+is ignored). The change takes effect immediately — towers and creeps re-read their numbers every frame,
 the palette reprices itself, and an installed rank changes under a tower
 already on the board. Only numbers are editable; flags like *flying* or
 *ignores fire* stay in `data.gd`.
@@ -682,7 +699,9 @@ restores the numbers in `data.gd`. The dev harnesses call
 
 Subjects are addressed by id — a bare tower id (`gun`), a creep as
 `enemy:grunt`, one upgrade track as `track:gun#0` — so the file stays
-readable and older files, which only ever held towers, still load. Anything
+readable and older files, which only ever held towers, still load. Inside a
+track, a key ending in `#N` belongs to rank N alone: `cost#2` is what the
+second rank costs, `mods.damage_mult#2` what it does. Anything
 that reads a balance number must go through `TDData.tower_def(id)`,
 `TDData.tracks(id)` or `TDData.enemy_def(kind)`; the raw `TDData.TOWERS` and
 `TDData.ENEMIES` tables bypass the editor.

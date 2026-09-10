@@ -2498,6 +2498,53 @@ func _check_tuning() -> void:
 			Tuning.describe(Tuning.track_subject("cannon", 0)).contains("ranks")
 			and Tuning.describe(Tuning.track_subject("cannon", 0)).contains("Siege"))
 
+	# Per-rank tuning: a rank can be priced and made to do its own thing.
+	var track := Tuning.track_subject("gun", 0)
+	var rank_keys: Array = []
+	for row: Dictionary in Tuning.rows_for(track):
+		rank_keys.append(str(row["key"]))
+	check("each rank gets its own rows",
+			rank_keys.has("cost#1") and rank_keys.has("gold#1")
+			and rank_keys.has("cost#2"))
+	check("and they are grouped by rank",
+			str(Tuning.rows_for(track)[-1].get("group", "")).begins_with("RANK"))
+	var stock_second := TDData.track_cost("gun", 0, 1)
+	Tuning.set_value(track, "cost#2", 999.0, -1)
+	check("a rank's coin price can be set outright",
+			TDData.track_cost("gun", 0, 1) == 999
+			and TDData.track_cost("gun", 0, 0) != 999)
+	Tuning.set_value(track, "gold#3", 42.0, -1)
+	check("so can what it costs to install in a match",
+			TDData.track_gold_cost("gun", 0, 2) == 42)
+	Tuning.clear_value(track, "cost#2", -1)
+	check("clearing one puts that rank back on the curve",
+			TDData.track_cost("gun", 0, 1) == stock_second)
+
+	# A rank can also be given its own effect, leaving the others alone.
+	var rank_mod := ""
+	for key: String in (TDData.TOWERS["gun"]["tracks"][0]["mods"] as Dictionary):
+		rank_mod = key
+	var one_rank := Tower.new()
+	one_rank.game = game
+	one_rank.setup("gun", Vector2i.ZERO)
+	one_rank.ranks[0] = 1
+	var at_one := one_rank.stat("damage")
+	one_rank.ranks[0] = 2
+	var at_two := one_rank.stat("damage")
+	Tuning.set_value(track, "mods.%s#2" % rank_mod,
+			float(TDData.TOWERS["gun"]["tracks"][0]["mods"][rank_mod]) * 2.0, -1)
+	var boosted_two := one_rank.stat("damage")
+	one_rank.ranks[0] = 1
+	var still_one := one_rank.stat("damage")
+	check("a rank can be given its own effect", boosted_two > at_two)
+	check("without touching the ranks either side of it",
+			is_equal_approx(still_one, at_one))
+	one_rank.free()
+	Tuning.clear_all()
+	check("and reset puts the whole curve back",
+			TDData.track_cost("gun", 0, 1) == stock_second
+			and not TDData.tracks("gun")[0].has("rank_mods"))
+
 	# Back to the global layer; the scope was flipped a few lines above.
 	panel.scope_level = -1
 
@@ -2505,7 +2552,7 @@ func _check_tuning() -> void:
 	var empty_modes: Array = []
 	for panel_mode: String in ["towers", "upgrades", "enemies"]:
 		panel._select_mode(panel_mode)
-		if panel.subjects().is_empty() or panel.value_labels.is_empty():
+		if panel.subjects().is_empty() or panel.value_fields.is_empty():
 			empty_modes.append(panel_mode)
 	check("every mode lists subjects with numbers (%s)" % ",".join(empty_modes),
 			empty_modes.is_empty())
@@ -2517,6 +2564,26 @@ func _check_tuning() -> void:
 			Tuning.value_of(Tuning.enemy_subject("tank"), "speed", -1) > tank_speed)
 	panel._select_mode("upgrades")
 	panel._select_tower(Tuning.track_subject("cannon", 0))
+	# Typing a number straight into the field.
+	panel._typed("7", "max")
+	check("a typed value is taken as written",
+			is_equal_approx(Tuning.value_of(Tuning.track_subject("cannon", 0),
+					"max", -1), 7.0))
+	panel._typed("1.35", "mods.damage_mult")
+	check("including fractions",
+			is_equal_approx(Tuning.value_of(Tuning.track_subject("cannon", 0),
+					"mods.damage_mult", -1), 1.35))
+	panel._typed("99999", "max")
+	check("out of range is clamped, not accepted",
+			Tuning.value_of(Tuning.track_subject("cannon", 0), "max", -1) <= 8.0)
+	var before_junk := Tuning.value_of(Tuning.track_subject("cannon", 0), "max", -1)
+	panel._typed("banana", "max")
+	check("and nonsense is ignored",
+			is_equal_approx(Tuning.value_of(Tuning.track_subject("cannon", 0),
+					"max", -1), before_junk))
+	check("every row has a field to type in",
+			panel.value_fields.size() == Tuning.rows_for(panel.current).size())
+	Tuning.clear_subject(Tuning.track_subject("cannon", 0), -1)
 	panel._nudge("max", 1.0)
 	check("and an upgrade track",
 			Tuning.effective(Tuning.track_subject("cannon", 0), -1).has("max"))

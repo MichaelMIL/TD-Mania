@@ -20,6 +20,12 @@ const FILE_PATH := "user://td_mania_tuning.cfg"
 ## Subjects are addressed by id: a bare tower id ("gun"), a creep as
 ## "enemy:grunt", one upgrade track as "track:gun#0". Towers stay bare so
 ## files written before enemies and upgrades were tunable still load.
+##
+## Inside a track subject, a key ending in "#N" belongs to rank N alone —
+## "cost#2" is what the second rank costs in coins, "gold#2" what it costs
+## to install in a match, "mods.damage_mult#2" what that rank actually
+## does. Without the suffix the key applies to the whole track, which is
+## the curve every rank follows unless it has been given its own number.
 const ENEMY_PREFIX := "enemy:"
 const TRACK_PREFIX := "track:"
 
@@ -271,17 +277,29 @@ static func base_of(subject: String) -> Dictionary:
 		var index := int(body[1])
 		if index < 0 or index >= list.size():
 			return {}
-		# Flattened so a modifier reads like any other number: the track's
-		# own fields, plus "mods.<key>" for each per-rank modifier.
+		# Flattened so every number reads alike: the track's own fields,
+		# "mods.<key>" for the modifier each rank applies, and then one set
+		# per rank — cost, gold and modifier — defaulting to what the curve
+		# would charge and do.
 		var flat: Dictionary = {}
 		var track: Dictionary = list[index]
 		for key: String in track:
 			if typeof(track[key]) == TYPE_INT or typeof(track[key]) == TYPE_FLOAT:
 				flat[key] = track[key]
+		var mod_keys: Array = []
 		for key: String in track.get("mods", {}):
 			var value: Variant = (track["mods"] as Dictionary)[key]
 			if typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT:
 				flat["mods." + key] = value
+				mod_keys.append(key)
+		# The tuned track decides how many ranks there are to show.
+		var tuned: Dictionary = TDData.tracks(body[0])[index]
+		for rank in range(1, int(tuned["max"]) + 1):
+			flat["cost#%d" % rank] = TDData.track_cost(body[0], index, rank - 1)
+			flat["gold#%d" % rank] = TDData.track_gold_cost(body[0], index, rank - 1)
+			for key: String in mod_keys:
+				flat["mods.%s#%d" % [key, rank]] = float(
+						(tuned["mods"] as Dictionary).get(key, track["mods"][key]))
 		return flat
 	return TDData.TOWERS.get(subject, {})
 
@@ -310,12 +328,36 @@ static func rows_for(subject: String) -> Array:
 	if is_track(subject):
 		for row: Dictionary in TRACK_TUNABLE:
 			if base.has(row["key"]):
-				out.append(row)
+				var whole: Dictionary = row.duplicate()
+				whole["group"] = "THE WHOLE TRACK"
+				out.append(whole)
 		# Modifiers vary per track, so their rows are built from the table.
 		for key: String in base:
-			if not key.begins_with("mods."):
+			if not key.begins_with("mods.") or key.contains("#"):
 				continue
-			out.append(_mod_row(key, float(base[key])))
+			var mod_row := _mod_row(key, float(base[key]))
+			mod_row["group"] = "THE WHOLE TRACK"
+			mod_row["info"] = "%s Every rank does this unless that rank has been given its own number below." % mod_row["info"]
+			out.append(mod_row)
+		# Then one block per rank: what it costs, and what it does.
+		var rank := 1
+		while base.has("cost#%d" % rank):
+			var group := "RANK %d" % rank
+			out.append({"key": "cost#%d" % rank, "name": "Coins", "step": 5.0,
+				"min": 1.0, "max": 100000.0, "group": group,
+				"info": "Coins to unlock rank %d in the tech tree. Overrides the cost curve for this rank alone." % rank})
+			out.append({"key": "gold#%d" % rank, "name": "Gold", "step": 5.0,
+				"min": 1.0, "max": 100000.0, "group": group,
+				"info": "Gold to install rank %d during a match, once it is unlocked." % rank})
+			for key: String in base:
+				if not key.begins_with("mods.") or not key.ends_with("#%d" % rank):
+					continue
+				var per := _mod_row(key.substr(0, key.find("#")), float(base[key]))
+				per["key"] = key
+				per["group"] = group
+				per["info"] = "What rank %d alone does. Set it to give a rank a different step from the rest of the track." % rank
+				out.append(per)
+			rank += 1
 		return out
 	var table: Array = ENEMY_TUNABLE if is_enemy(subject) else TUNABLE
 	for row: Dictionary in table:

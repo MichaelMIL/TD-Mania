@@ -992,16 +992,42 @@ static func tracks(type_id: String) -> Array:
 			tuned = true
 		var track: Dictionary = out[i]
 		for key: String in over:
-			if key.begins_with("mods."):
-				# A per-rank modifier, e.g. "mods.damage_mult".
-				var mod_key := key.substr(5)
-				(track["mods"] as Dictionary)[mod_key] = float(over[key])
-			elif typeof(track.get(key)) == TYPE_INT:
-				track[key] = int(round(float(over[key])))
+			# Keys ending in "#N" belong to rank N alone; the rest apply to
+			# the whole track. See Tuning for where these are written.
+			var rank := 0
+			var field := key
+			var hash_at := key.find("#")
+			if hash_at > 0:
+				rank = int(key.substr(hash_at + 1))
+				field = key.substr(0, hash_at)
+			if rank > 0:
+				if field == "cost":
+					_put_rank(track, "rank_costs", rank, int(round(float(over[key]))))
+				elif field == "gold":
+					_put_rank(track, "rank_gold", rank, int(round(float(over[key]))))
+				elif field.begins_with("mods."):
+					if not track.has("rank_mods"):
+						track["rank_mods"] = {}
+					var per: Dictionary = track["rank_mods"]
+					if not per.has(rank):
+						# Ranks left alone keep the track's own modifier.
+						per[rank] = (track["mods"] as Dictionary).duplicate()
+					(per[rank] as Dictionary)[field.substr(5)] = float(over[key])
+				continue
+			if field.begins_with("mods."):
+				(track["mods"] as Dictionary)[field.substr(5)] = float(over[key])
+			elif typeof(track.get(field)) == TYPE_INT:
+				track[field] = int(round(float(over[field])))
 			else:
-				track[key] = float(over[key])
+				track[field] = float(over[key])
 	_tuned_tracks[type_id] = out
 	return out
+
+
+static func _put_rank(track: Dictionary, bag: String, rank: int, value: int) -> void:
+	if not track.has(bag):
+		track[bag] = {}
+	(track[bag] as Dictionary)[rank] = value
 
 
 ## Copies a table entry with the overridden numbers written over it, keeping
@@ -1476,6 +1502,10 @@ static var TOWER_ORDER: Array = ["gun", "cannon", "frost", "tarpit", "tesla", "m
 ## buy the *right* to install that rank; gold pays for it in each match.
 static func track_cost(type_id: String, track: int, rank: int) -> int:
 	var t: Dictionary = tracks(type_id)[track]
+	# `rank` is how many are already owned, so this prices rank + 1.
+	var per: Dictionary = t.get("rank_costs", {})
+	if per.has(rank + 1):
+		return maxi(1, int(per[rank + 1]))
 	var base := float(tower_def(type_id)["cost"]) * float(t["cost_frac"]) / 3.5
 	return maxi(4, int(round(base * pow(1.6, float(rank)))))
 
@@ -1483,6 +1513,9 @@ static func track_cost(type_id: String, track: int, rank: int) -> int:
 ## Gold cost of installing rank `rank + 1` on a tower during a match.
 static func track_gold_cost(type_id: String, track: int, rank: int) -> int:
 	var t: Dictionary = tracks(type_id)[track]
+	var per: Dictionary = t.get("rank_gold", {})
+	if per.has(rank + 1):
+		return maxi(1, int(per[rank + 1]))
 	return int(float(tower_def(type_id)["cost"]) * float(t["cost_frac"]) * 0.9
 			* pow(1.4, float(rank)))
 
@@ -1497,7 +1530,14 @@ static func mods_for(type_id: String, ranks: Array) -> Dictionary:
 		var rank: int = int(ranks[i])
 		if rank <= 0:
 			continue
-		_merge(out, list[i]["mods"], rank)
+		var per_rank: Dictionary = list[i].get("rank_mods", {})
+		if per_rank.is_empty():
+			_merge(out, list[i]["mods"], rank)
+		else:
+			# Tuning has given at least one rank its own numbers, so the
+			# ranks are merged one at a time rather than raised to a power.
+			for r in range(1, rank + 1):
+				_merge(out, per_rank.get(r, list[i]["mods"]), 1)
 		if rank >= int(list[i]["max"]) and list[i].has("capstone"):
 			_merge(out, list[i]["capstone"]["mods"], 1)
 	return out
