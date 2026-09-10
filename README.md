@@ -740,6 +740,20 @@ fast as a 120 Hz display allows, and the `App` autoload drops it to 10 fps
 whenever the window is in the background — a tower defence left open should
 not keep a core busy.
 
+### The verify suite
+
+The checks live in `dev/suites/`, one script per area of the game — basics,
+towers, combat, maps, waves, account — because a single file of three and a
+half thousand assertions is a file nobody can find anything in.
+`dev/dev_verify.gd` is now a 60-line runner: it builds one match, hands it
+to each suite, and prints a per-suite tally plus the total. A suite is a
+`VerifySuite` with `game` and a `check()` that funnels back to the runner,
+so a failure names the suite it came from.
+
+Adding a check means adding it to the suite it belongs to. Suites must not
+depend on the order they run in — the split turned up one that did, and it
+was a test bug rather than a game bug.
+
 ### The balance report
 
 `dev/dev_report.tscn` is what makes the difficulty ladder measurable instead
@@ -956,8 +970,9 @@ match.
 Three headless harnesses live in `dev/` and are not part of the game:
 
 ```bash
-godot --headless dev/dev_verify.tscn    # 332 logic assertions (placement, economy,
-                                        # upgrades, armor, slows, splash, waves)
+godot --headless dev/dev_verify.tscn    # 640 assertions across six suites in
+                                        # dev/suites/ (basics, towers, combat,
+                                        # maps, waves, account)
 godot --headless dev/dev_balance.tscn   # auto-plays with a crude builder AI and
                                         # prints the wave-by-wave difficulty curve
 godot --headless dev/dev_balance.tscn -- --level 2   # simulate a specific map

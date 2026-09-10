@@ -70,25 +70,12 @@ the same loop per area; a match plays its area's pad, the menus play the
 plain one.
 ## Robustness
 
-- [ ] **Split `dev/dev_verify.gd`.** Past 3,400 lines, and every new
-      feature lands in the same file. One script per area of the game
-      (progress, combat, maps, UI) with a runner that loads them would make
-      a failure easier to place and the file easier to add to.
-- [x] **Saves have no safety net.** *Implemented 2026-09-11.* Writes land by
-rename with the previous copy kept as `.bak`; reads fall back to it and
-refuse a file that is not a save.
-- [x] **Runs are not reproducible.** *Implemented 2026-09-11.* A run draws
-one seed, carries it in the parked state with its handicaps, and shows it in
-the pause menu.
-- [x] **Creeps are allocated and freed every wave.** *Measured 2026-09-11,
-      and left alone.* `dev/dev_perf.tscn -- --churn` creates, sets up and
-      frees 200 creeps: 0.95 ms to make them, 0.27 ms to free them. A heavy
-      wave spawns about 70 creeps over 45 seconds, which works out at
-      **0.009 ms per second of play** — nothing. Pooling would buy that
-      back in exchange for reusing nodes with stale state, which is the
-      exact class of bug that produced the freed-object crashes. Not worth
-      it; the benchmark stays so the decision can be re-checked if creep
-      counts ever change by an order of magnitude.
+- [x] **Split `dev/dev_verify.gd`.** *Implemented 2026-09-11.* The checks
+      live in `dev/suites/` — basics, towers, combat, maps, waves, account
+      — behind a `VerifySuite` base that hands each one the match and a
+      `check()` funnelling back to a 60-line runner, which prints a
+      per-suite tally. The split immediately turned up a test that had been
+      relying on running first.
 
 ## Notes
 
