@@ -241,3 +241,118 @@ color-coded — they are small on screen (roughly 20-50 px tall).
 > Small glowing round energy projectile for a top-down game, bright white-hot
 > core with a soft colorless outer glow (the game tints it per tower), no
 > motion trail, no background. Transparent PNG, centered.
+
+---
+
+## Towers added since the first pass
+
+Same two-file pattern as the towers above: a `_base` that never rotates and a
+`_gun` that the game turns to face its target. Leave the gun pointing right
+(east) at 0°.
+
+**`tower_tarpit_base.png`** (256x256)
+> Top-down circular pit of black tar set in a stone kerb, viscous surface with
+> slow glossy bubbles, a few reeds at the rim. No mechanism, no barrel — this
+> tower has no gun.
+
+**`tower_tarpit_gun.png`** (256x256)
+> Top-down slow bubble rising from black tar, a single glossy dome with a thin
+> highlight ring, centered, small. Reads as motion in the pit beneath it.
+
+**`tower_mine_base.png`** (256x256)
+> Top-down mine head: a square timber platform over a shaft, ore cart rails
+> crossing it, small heap of gold ore glinting at one corner. Industrial, warm
+> brown and brass.
+
+**`tower_mine_gun.png`** (256x256)
+> Top-down winch wheel with a taut cable, brass and dark iron, pointing right.
+
+**`tower_shock_base.png`** (256x256)
+> Top-down heavy iron drum sunk into a stone ring, thick rivets, concentric
+> grooves in the ground around it as if the earth has been hammered.
+
+**`tower_shock_gun.png`** (256x256)
+> Top-down piston hammer head seen from above, blunt iron block on a short arm
+> pointing right, glowing amber seam where it strikes.
+
+**`tower_ballista_base.png`** (256x256)
+> Top-down timber siege platform, cross-braced beams, a rack of spare bolts
+> along one edge, iron fittings.
+
+**`tower_ballista_gun.png`** (256x256)
+> Top-down ballista arms and rail seen from above, two curved limbs with a
+> drawn string and a loaded bolt pointing right, dark timber and steel.
+
+**`tower_laser_base.png`** (256x256)
+> Top-down white ceramic emitter housing with cooling fins and a cable coil,
+> clean high-tech, faint magenta glow in the seams.
+
+**`tower_laser_gun.png`** (256x256)
+> Top-down focusing barrel with three lens rings, magenta core light, pointing
+> right, thin and precise.
+
+**`tower_wavegun_base.png`** (256x256)
+> Top-down floating pontoon of riveted blue-grey metal, water sloshing over the
+> rim, mooring cleats at the corners. Sits on water.
+
+**`tower_wavegun_gun.png`** (256x256)
+> Top-down wide-mouthed water cannon seen from above, flared nozzle pointing
+> right, pale blue surge curling at the mouth.
+
+---
+
+## Enemies added since the first pass
+
+All 192x192 unless noted, transparent, seen straight down, facing right.
+
+**`enemy_brood.png`**
+> Top-down bloated purple carrier creature, translucent sac on its back with
+> smaller shapes visible inside, six short legs. Reads as "this will split".
+
+**`enemy_mender.png`**
+> Top-down pale green robed creature holding a glowing vial above itself, soft
+> healing aura ring. Clearly a support unit, not a fighter.
+
+**`enemy_warden.png`**
+> Top-down heavily armoured walker, overlapping steel plates like a tortoise
+> shell, narrow visor slit, slate grey with cold blue trim. Reads as slow and
+> nearly impervious.
+
+**`enemy_ashwalker.png`**
+> Top-down creature made of cracked charcoal with molten orange fissures,
+> smouldering shoulders, no visible eyes. Reads as already on fire.
+
+**`enemy_bolt.png`**
+> Top-down lean yellow sprinter, streamlined body with swept-back spines and
+> crackling energy at its heels. Reads as very fast.
+
+**`enemy_thief.png`**
+> Top-down hunched violet figure in a hood with a bulging coin pouch, one hand
+> clutching gold. Reads as a pickpocket.
+
+**`enemy_moth.png`** (flying)
+> Top-down pink-red moth with wide patterned wings and glowing ember specks
+> along the body, seen from directly above with wings spread. Drawn as if
+> airborne — no legs touching ground.
+
+**`enemy_drake.png`** (flying, 224x224)
+> Top-down armoured indigo drake seen from directly above, plated back, broad
+> ribbed wings spread wide, short tail. Heavy and mechanical rather than
+> organic.
+
+**`enemy_titan.png`** (320x320)
+> Top-down colossal armoured brute, dark iron plating with red glowing joints,
+> four heavy limbs, deliberately larger and nastier than the Behemoth boss.
+
+---
+
+## Per-level tile variants
+
+Every tile accepts a variant named after the level id, which wins over the
+generic file: `tile_grass_<id>.png`, `tile_path_<id>.png`,
+`tile_water_<id>.png`, `tile_rock_<id>.png`. The ids are in `TDData.LEVELS`
+(`verdant`, `meadow`, `highlands`, `fernhollow`, `riverfork`, `crossroads`,
+`saltmarsh`, `desert`, `ashen`, `obelisk`, `frostbite`, `glacier`, `coast`,
+`twingates`, `junction`, `ruins`, `delta`, `comb`, `pipeworks`,
+`convergence`), and each level's `palette` entry gives the colours its
+vector art currently uses — a good brief for the sprite.

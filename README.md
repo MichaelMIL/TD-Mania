@@ -445,6 +445,11 @@ capstones, Tesla and the Marksman matter later on.
 
 ## Art
 
+`assets/PROMPTS.md` holds a ready-to-paste Gemini prompt for every one of
+these names, with a shared style line so the set comes out consistent. The
+verify suite fails if a tower or creep is ever added without a matching
+prompt, so the sheet cannot drift behind the game.
+
 All drawing falls back to vector primitives, but `scripts/art.gd` checks
 `assets/` first for a matching `.png`, `.webp`, or `.jpg` and uses it instead.
 Images are loaded straight off disk, so adding files needs no reimport — just
@@ -457,14 +462,15 @@ assets/tile_water.png          seamless water (replaces the animated surface)
 assets/tile_rock.png           unbuildable rubble
 assets/tower_gun_base.png      top-down tower base (transparent)
 assets/tower_gun_gun.png       turret, barrel pointing RIGHT (rotated in code)
-assets/tower_cannon_base.png   ... same _base / _gun pair for every tower:
-assets/tower_cannon_gun.png    cannon, frost, tesla, marksman, flame, mortar,
-                               tide, torpedo, airfield, helipad, command
+assets/tower_cannon_base.png   ... same _base / _gun pair for every tower in
+assets/tower_cannon_gun.png    TDData.TOWERS: cannon, frost, tesla, marksman,
+                               flame, mortar, tide, torpedo, airfield, helipad,
+                               command, tarpit, mine, shock, ballista, laser,
+                               wavegun
 assets/enemy_grunt.png         top-down creep, facing RIGHT, transparent
-assets/enemy_runner.png
-assets/enemy_swarm.png
-assets/enemy_tank.png
-assets/enemy_boss.png
+assets/enemy_runner.png        ... one per kind in TDData.ENEMIES: swarm, tank,
+assets/enemy_tank.png          brood, mender, warden, ashwalker, bolt, thief,
+assets/enemy_boss.png          moth, drake, titan
 assets/unit_plane.png          bomber seen from above, nose pointing RIGHT
 assets/unit_heli.png           gunship seen from above, nose pointing RIGHT
 assets/shot.png                small projectile blob

@@ -215,6 +215,7 @@ func _ready() -> void:
 	_check_objectives()
 	_check_respec()
 	_check_options()
+	_check_art_prompts()
 	_check_enemy_kinds()
 	_check_cheats()
 	_check_audio()
@@ -1513,6 +1514,42 @@ func _check_targeting() -> void:
 
 
 
+
+
+
+
+## The sprite drop-in has to stay honest: a prompt for every name the game
+## will look for, and the loader must fall back cleanly when a file is absent.
+func _check_art_prompts() -> void:
+	var prompts := FileAccess.get_file_as_string("res://assets/PROMPTS.md")
+	check("the prompt sheet exists", prompts.length() > 1000)
+	var missing: Array = []
+	for type_id: String in TDData.TOWERS:
+		for part: String in ["base", "gun"]:
+			if not prompts.contains("tower_%s_%s" % [type_id, part]):
+				missing.append("tower_%s_%s" % [type_id, part])
+	for kind: String in TDData.ENEMIES:
+		if not prompts.contains("enemy_%s" % kind):
+			missing.append("enemy_%s" % kind)
+	for tile: String in ["tile_grass", "tile_path", "tile_water", "tile_rock"]:
+		if not prompts.contains(tile):
+			missing.append(tile)
+	for unit: String in ["unit_plane", "unit_heli", "shot"]:
+		if not prompts.contains(unit):
+			missing.append(unit)
+	check("every sprite the game looks for has a prompt (%s)"
+			% ", ".join(missing), missing.is_empty())
+
+	# With no file present the loader must say so rather than half-draw.
+	check("a missing sprite loads as nothing",
+			Art.tex("definitely_not_a_real_sprite_name") == null)
+	var probe := Control.new()
+	add_child(probe)
+	check("and drawing it reports the miss so vector art takes over",
+			not Art.draw_centered(probe, "definitely_not_a_real_sprite_name",
+					Vector2.ZERO, 32.0))
+	remove_child(probe)
+	probe.queue_free()
 
 
 ## Options: volumes, window scale and key bindings, including the swap that

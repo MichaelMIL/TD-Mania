@@ -113,9 +113,14 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
       key. Taking a key another action holds swaps the two rather than
       double-binding, and the game looks keys up by action
       (`Progress.action_for()`), so the HUD prompts follow whatever is bound.
-- [ ] **Generate the art.** `assets/PROMPTS.md` is written and the loader in
-      `scripts/art.gd` picks files up with no reimport; dropping in real
-      sprites is a one-evening visual overhaul.
+- [~] **Generate the art.** *Ready for you, 2026-09-10 — needs your Gemini
+      run.* `assets/PROMPTS.md` now covers every sprite the game actually
+      looks for: the six towers and nine creeps added since the first pass
+      (including the two flyers), plus the per-level tile variants and the
+      naming rule for them. The verify suite fails if a tower or creep is
+      ever added without a prompt, and asserts the loader falls back to
+      vector art when a file is absent. Drop the PNGs into `assets/` and
+      they appear on the next launch — no reimport, no code change.
 - [x] **Board tooltips.** *Implemented 2026-09-10.* Hovering a creep pops a
       card by the cursor: name, current and maximum health, armour, speed,
       and every trait that decides how to answer it — flying, slow- or
