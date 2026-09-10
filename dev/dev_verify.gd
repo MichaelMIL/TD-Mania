@@ -213,6 +213,7 @@ func _ready() -> void:
 	_check_wave_affixes()
 	_check_boss_abilities()
 	_check_hazards()
+	_check_modifiers()
 	_check_flyers()
 	_check_board_tooltips()
 	_check_objectives()
@@ -2291,6 +2292,89 @@ func _road_length(points: PackedVector2Array) -> float:
 
 
 
+
+
+
+
+## Chosen handicaps: enforced during the run, paid for at the end.
+func _check_modifiers() -> void:
+	var described := true
+	var bonuses := 0.0
+	for m: Dictionary in TDData.MODIFIERS:
+		if str(m["name"]) == "" or str(m.get("note", "")).length() < 12 \
+				or float(m["bonus"]) <= 0.0:
+			described = false
+		bonuses += float(m["bonus"])
+	check("every handicap is named, explained and paid for", described)
+	check("all of them together is a serious multiplier, not a doubling",
+			bonuses > 0.5 and bonuses < 1.5)
+	check("no handicap means no multiplier",
+			is_equal_approx(TDData.modifier_bonus([]), 1.0))
+	check("two of them add up", TDData.modifier_bonus(["no_water", "no_sell"])
+			> TDData.modifier_bonus(["no_water"]))
+
+	var saved: Array = game.modifiers.duplicate()
+	# Dry feet: water towers cannot be built at all.
+	var water_cell := Vector2i(-99, -99)
+	for key: Vector2i in game.terrain:
+		if game.can_place(key, "tide"):
+			water_cell = key
+			break
+	check("a water tower has somewhere to stand normally", water_cell.x >= 0)
+	game.modifiers = ["no_water"]
+	check("dry feet blocks it", not game.can_place(water_cell, "tide"))
+	var dry_cell := Vector2i(-99, -99)
+	for key: Vector2i in game.terrain:
+		if game.can_place(key, "gun"):
+			dry_cell = key
+			break
+	check("but leaves dry ground alone", dry_cell.x >= 0)
+
+	# No refunds: selling is refused rather than silently allowed.
+	var sell_cell := Vector2i(-99, -99)
+	for key: Vector2i in game.terrain:
+		if game.can_place(key, "gun"):
+			sell_cell = key
+			break
+	game.modifiers = []
+	game.gold = 999
+	game.placing = "gun"
+	game._try_place(sell_cell)
+	game.placing = ""
+	var doomed: Tower = game.occupied[sell_cell]
+	game._select(doomed)
+	game.modifiers = ["no_sell"]
+	var before_gold: int = game.gold
+	game._sell_selected()
+	check("no refunds refuses the sale",
+			game.occupied.has(sell_cell) and game.gold == before_gold)
+	game.modifiers = []
+	game._sell_selected()
+	check("and without it the sale goes through", not game.occupied.has(sell_cell))
+
+	# Skeleton crew: a hard cap on how many towers can stand at once.
+	game.modifiers = ["budget"]
+	var cap := int(TDData.modifier("budget").get("towers", 12))
+	var placed := 0
+	game.gold = 999999
+	for key: Vector2i in game.terrain:
+		if placed >= cap + 3:
+			break
+		if game.can_place(key, "gun"):
+			game.placing = "gun"
+			game._try_place(key)
+			game.placing = ""
+			placed += 1
+	check("skeleton crew stops at its budget (%d)" % game.occupied.size(),
+			game.occupied.size() <= cap)
+	for cell: Vector2i in game.occupied.keys():
+		var t: Tower = game.occupied[cell]
+		game.occupied.erase(cell)
+		if is_instance_valid(t):
+			t.queue_free()
+	game.support_towers.clear()
+	game.modifiers = saved
+	game._select(null)
 
 
 ## Map hazards: one map-wide rule, said out loud.

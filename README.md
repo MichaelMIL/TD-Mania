@@ -461,6 +461,19 @@ Flamethrower) cannot, and neither can their splash — a shell that lands under
 a Drake does nothing to it. The palette says "ground only" for those, so an
 air wave forces a mixed defence rather than more of the same tower.
 
+### Handicaps
+
+Under every unlocked level card is a row of optional handicaps, chosen
+before the run and paid for at the end: **Dry feet** (no water towers,
++15%), **Skeleton crew** (twelve towers, +25%), **No refunds** (nothing can
+be sold, +10%) and **Thin line** (half the usual lives, +30%). They stack,
+and the multiplier applies to the XP and coins the run banks.
+
+Each one is *enforced* rather than checked afterwards — a water tower
+cannot be built at all under Dry feet, the thirteenth tower is refused
+under Skeleton crew — so an honest run is the only kind there is. The
+in-match info panel names whichever are running.
+
 ### Map hazards
 
 Eight of the thirty maps run under a weather rule that bends one thing

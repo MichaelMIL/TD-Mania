@@ -321,6 +321,45 @@ func _objective_texts(level: Dictionary, earned: int) -> Array:
 	return out
 
 
+## Handicaps for the next run: chosen here, enforced in the match, paid for
+## in the reward. The choice is shared by every card, since only one run
+## starts at a time.
+func _modifier_row() -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	var bonus := TDData.modifier_bonus(TDData.selected_modifiers)
+	var label := _label("Handicaps  +%d%%" % int(round((bonus - 1.0) * 100.0))
+			if bonus > 1.0 else "Handicaps", 11, Color("ffca28"))
+	label.custom_minimum_size.x = 96.0
+	row.add_child(label)
+	for m: Dictionary in TDData.MODIFIERS:
+		var id := str(m["id"])
+		var on: bool = TDData.selected_modifiers.has(id)
+		var b := Button.new()
+		b.text = "%s +%d%%" % [m["name"], int(round(float(m["bonus"]) * 100.0))]
+		b.tooltip_text = str(m["note"])
+		b.custom_minimum_size = Vector2(0.0, 26.0)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.add_theme_font_size_override("font_size", 11)
+		b.focus_mode = Control.FOCUS_NONE
+		b.modulate = Color("9ce89c") if on else Color(1, 1, 1, 0.55)
+		b.pressed.connect(_toggle_modifier.bind(id))
+		row.add_child(b)
+	return row
+
+
+func _toggle_modifier(id: String) -> void:
+	if TDData.selected_modifiers.has(id):
+		TDData.selected_modifiers.erase(id)
+	else:
+		TDData.selected_modifiers.append(id)
+	# The choice shows on every card, so the screen is rebuilt wholesale.
+	for child in get_children():
+		remove_child(child)
+		child.queue_free()
+	_build()
+
+
 func _level_card(index: int) -> Control:
 	var d: Dictionary = TDData.LEVELS[index]
 	var tier: Dictionary = TDData.tier_of(d)
@@ -409,6 +448,9 @@ func _level_card(index: int) -> Control:
 				11, Color(1, 1, 1, 0.5))
 		goals.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		text.add_child(goals)
+
+	if unlocked:
+		col.add_child(_modifier_row())
 
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 6)

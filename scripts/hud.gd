@@ -735,6 +735,12 @@ func refresh_info(hovered_type: String = "") -> void:
 	var blurb_text: String = str(game.level_def["blurb"])
 	if not weather.is_empty():
 		blurb_text += "   ⚠ %s: %s" % [weather["name"], weather["note"]]
+	if not game.modifiers.is_empty():
+		var chosen: Array = []
+		for id: String in game.modifiers:
+			chosen.append(str(TDData.modifier(id).get("name", id)))
+		blurb_text += "   ⚑ %s (+%d%% reward)" % [", ".join(chosen),
+				int(round((TDData.modifier_bonus(game.modifiers) - 1.0) * 100.0))]
 	info_body.text = "%s\n%s\nDrag a tower onto the map. %s upgrades, %s sells, %s starts a wave early. %s auto, %s target, %s pause, %s speed, %s menu." \
 			% [blurb_text, "    ".join(game.objective_lines(true)),
 			Progress.key_name("upgrade"), Progress.key_name("sell"),

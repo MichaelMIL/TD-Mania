@@ -265,6 +265,41 @@ static func wave_rule_active(rule: Dictionary, n: int) -> bool:
 	return every <= 1 or n % every == int(rule.get("offset", 0))
 
 
+## -------------------------------------------------------------- modifiers
+##
+## Handicaps you choose before a run, for more XP and coins. The objectives
+## already knew how to judge most of these; this makes them a decision at
+## the start rather than a discovery at the end.
+static var MODIFIERS: Array = [
+	{"id": "no_water", "name": "Dry feet", "bonus": 0.15,
+		"note": "No water towers at all."},
+	{"id": "budget", "name": "Skeleton crew", "bonus": 0.25, "towers": 12,
+		"note": "Twelve towers, no more."},
+	{"id": "no_sell", "name": "No refunds", "bonus": 0.10,
+		"note": "Nothing can be sold once it is built."},
+	{"id": "thin_lives", "name": "Thin line", "bonus": 0.30,
+		"note": "Start with half the usual lives."},
+]
+
+## Chosen on the level card, read by the match that starts next.
+static var selected_modifiers: Array = []
+
+
+static func modifier(id: String) -> Dictionary:
+	for m: Dictionary in MODIFIERS:
+		if str(m["id"]) == id:
+			return m
+	return {}
+
+
+## What the chosen handicaps multiply the run's payout by.
+static func modifier_bonus(ids: Array) -> float:
+	var total := 1.0
+	for id: String in ids:
+		total += float(modifier(id).get("bonus", 0.0))
+	return total
+
+
 ## ---------------------------------------------------------------- hazards
 ##
 ## A map-wide rule that bends one thing about how towers work. Most maps

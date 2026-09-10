@@ -1027,9 +1027,15 @@ static func run_reward(waves: int, score: int, tier: int) -> Dictionary:
 
 
 ## Banks a run's reward and reports what changed, including any level-ups.
-static func award(waves: int, score: int, tier: int) -> Dictionary:
+## Pays a run out, with a multiplier for whatever handicaps it ran under.
+static func award(waves: int, score: int, tier: int,
+		multiplier: float = 1.0) -> Dictionary:
 	load_state()
 	var reward := run_reward(waves, score, tier)
+	if multiplier > 1.0:
+		reward["xp"] = int(round(float(reward["xp"]) * multiplier))
+		reward["coins"] = int(round(float(reward["coins"]) * multiplier))
+		reward["multiplier"] = multiplier
 	var before := level()
 	xp += int(reward["xp"])
 	coins += int(reward["coins"])

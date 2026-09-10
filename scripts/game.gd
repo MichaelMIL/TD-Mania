@@ -13,6 +13,12 @@ const BREAK_TIME := 16.0
 var speeds: Array = [1.0]
 ## The map's hazard, if it has one. Empty on most maps.
 var hazard: Dictionary = {}
+## Handicaps chosen before the run started.
+var modifiers: Array = []
+
+
+func has_modifier(id: String) -> bool:
+	return modifiers.has(id)
 
 
 ## A hazard multiplier, or 1.0 where the map has no hazard.
@@ -136,6 +142,11 @@ func _ready() -> void:
 	speeds = Progress.speeds()
 	# One map-wide rule, read once: towers and aircraft ask the game for it.
 	hazard = TDData.hazard_of(level_def)
+	# Handicaps chosen on the level card. They are enforced here rather than
+	# checked afterwards, so an honest run is the only kind there is.
+	modifiers = TDData.selected_modifiers.duplicate()
+	if has_modifier("thin_lives"):
+		lives = maxi(1, lives / 2)
 	if TDData.resume_run:
 		_restore_run(Progress.run_for(str(level_def["id"])))
 	TDData.resume_run = false
@@ -274,6 +285,13 @@ func tower_cost(type_id: String) -> int:
 func can_place(c: Vector2i, type_id: String = "") -> bool:
 	if not in_bounds(c) or occupied.has(c):
 		return false
+	if type_id != "":
+		if has_modifier("no_water") \
+				and int(TDData.tower_def(type_id)["terrain"]) == TDData.Terrain.WATER:
+			return false
+		if has_modifier("budget") and occupied.size() >= int(
+				TDData.modifier("budget").get("towers", 12)):
+			return false
 	if type_id != "" and not Progress.tower_unlocked(type_id):
 		return false
 	var kind := terrain_at(c)
@@ -536,6 +554,10 @@ func _cycle_target_mode() -> void:
 
 func _sell_selected() -> void:
 	if selected == null:
+		return
+	if has_modifier("no_sell"):
+		fx_text(selected.position + Vector2(0.0, -34.0), "No refunds this run",
+				Color("ef5350"), 15)
 		return
 	var value := selected.sell_value()
 	gold += value
@@ -1115,7 +1137,9 @@ func _bank_reward() -> Dictionary:
 	var waves := maxi(0, wave - 1)
 	if waves <= 0:
 		return {}
-	var reward := Progress.award(waves, score, int(level_def["tier"]))
+	# Handicaps pay: the run was harder, so the account gets more for it.
+	var reward := Progress.award(waves, score, int(level_def["tier"]),
+			TDData.modifier_bonus(modifiers))
 	# Roll the run's tallies into the lifetime stats alongside the payout.
 	var tallies := run_stats.duplicate(true)
 	tallies["runs"] = 1
