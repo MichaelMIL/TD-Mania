@@ -1,4 +1,4 @@
 .godot/
-export_presets.cfg
 *.import
 .DS_Store
+build/

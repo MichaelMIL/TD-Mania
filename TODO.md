@@ -19,11 +19,13 @@ harnesses.
       account with no runs, never on a resumed one, skippable, and every
       step is a condition on the match itself so it cannot disagree with
       the game.
-- [ ] **Anyone else can play it.** There is no export preset, so the game
-      runs from the CLI or the editor and nowhere else. Add a web export
-      plus a GitHub Actions workflow running `dev/run_checks.sh` on push,
-      and the repo becomes a link you can send. *Cheap, and it changes what
-      the project is.*
+- [x] **Anyone else can play it.** *Implemented 2026-09-11.* Export
+      presets for Web and macOS are committed (`dev/` excluded, web forced
+      onto `gl_compatibility` since Forward+ cannot run on WebGL2), and
+      `.github/workflows/checks.yml` runs `dev/run_checks.sh` on every push
+      then builds the web export and keeps it as an artifact. The web build
+      was produced and checked locally; the workflow itself is unverified
+      until GitHub runs it.
 - [ ] **Generate the art.** *Waiting on you.* `assets/PROMPTS.md` covers
       every sprite the game looks for — including the ten new road surfaces
       and decor motifs — and `scripts/art.gd` picks PNGs up off disk with no

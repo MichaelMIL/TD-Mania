@@ -27,5 +27,7 @@ window/stretch/aspect="keep"
 
 renderer/rendering_method="forward_plus"
 renderer/rendering_method.mobile="mobile"
+; The web build runs on WebGL2, which the Forward+ path cannot use.
+renderer/rendering_method.web="gl_compatibility"
 environment/defaults/default_clear_color=Color(0.06, 0.08, 0.11, 1)
 anti_aliasing/quality/msaa_2d=2

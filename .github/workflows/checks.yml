@@ -1,0 +1,67 @@
+name: checks
+
+# Every push runs the same harnesses the project runs locally, and builds
+# the web export so a broken build is caught here rather than on the day
+# someone asks for a link.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: 4.7.1
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot
+        run: |
+          set -eux
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -fsSL -o godot.zip "${base}/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          sudo install -m 755 "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+
+      - name: Import the project
+        # First run builds the class cache and the import metadata the
+        # harnesses need; it is expected to be noisy.
+        run: godot --headless --editor --quit || true
+
+      - name: Run the checks
+        run: dev/run_checks.sh
+
+  web:
+    runs-on: ubuntu-latest
+    needs: checks
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot and its export templates
+        run: |
+          set -eux
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -fsSL -o godot.zip "${base}/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          sudo install -m 755 "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          curl -fsSL -o templates.tpz "${base}/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          mkdir -p "${HOME}/.local/share/godot/export_templates"
+          unzip -q templates.tpz
+          mv templates "${HOME}/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+
+      - name: Import the project
+        run: godot --headless --editor --quit || true
+
+      - name: Export for the web
+        run: |
+          mkdir -p build/web
+          godot --headless --export-release "Web" build/web/index.html
+
+      - name: Keep the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: td-mania-web
+          path: build/web

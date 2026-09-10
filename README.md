@@ -12,9 +12,29 @@ Drop PNGs into `assets/` and they take over automatically (see [Art](#art)).
 ## Run it
 
 ```bash
-godot --path .          # save slots -> level select -> play
+godot --path .          # save slots -> main menu -> play
 godot -e --path .       # open in the editor
 ```
+
+## Build it
+
+Export presets for **Web** and **macOS** are committed, so a build is one
+command:
+
+```bash
+godot --headless --export-release "Web" build/web/index.html
+godot --headless --export-release "macOS" "build/macos/TD Mania.zip"
+```
+
+The web build runs on WebGL2 — `rendering_method.web` is set to
+`gl_compatibility`, since the Forward+ path the desktop build uses cannot.
+`dev/` is excluded from both, so the harnesses do not ship.
+
+`.github/workflows/checks.yml` runs `dev/run_checks.sh` on every push and,
+if it passes, builds the web export and keeps it as a workflow artifact.
+Serving it needs cross-origin isolation headers (the preset asks for them);
+the workflow uploads rather than deploys, so pointing it at GitHub Pages is
+a few lines when you want a public link.
 
 ## Save slots
 
