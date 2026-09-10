@@ -8,7 +8,9 @@ extends Node2D
 
 const PREP_TIME := 14.0
 const BREAK_TIME := 16.0
-const SPEEDS: Array = [1.0, 2.0, 3.0]
+## Speeds this run may use. Everyone has 1x; the rest are unlocked by the
+## "tempo" doctrine, so fast-forward is earned rather than assumed.
+var speeds: Array = [1.0]
 const MENU_SCENE := "res://menu.tscn"
 
 var level_def: Dictionary = {}
@@ -90,6 +92,7 @@ var wave_report_timer: float = 0.0
 var cheats_used: bool = false
 var cheats: Cheats
 var tuning_panel: TuningPanel
+var pause_menu: PauseMenu
 ## Every widget lives on this; see hud.gd.
 var hud: GameHUD
 
@@ -115,10 +118,17 @@ func _ready() -> void:
 	best_wave = Progress.best_wave(str(level_def["id"]))
 	_build_terrain()
 	_build_world()
+	speeds = Progress.speeds()
 	if TDData.resume_run:
 		_restore_run(Progress.run_for(str(level_def["id"])))
 	TDData.resume_run = false
 	preview.announce()
+	var overlay := CanvasLayer.new()
+	overlay.layer = 15
+	add_child(overlay)
+	pause_menu = PauseMenu.new()
+	pause_menu.game = self
+	overlay.add_child(pause_menu)
 	if Cheats.available():
 		Cheats.reset_toggles()
 		cheats = Cheats.new()
@@ -137,7 +147,6 @@ func _ready() -> void:
 	hud.build()
 	hud.btn_auto.text = "Auto ●" if auto_start else "Auto ○"
 	hud.btn_auto.modulate = Color("9ce89c") if auto_start else Color.WHITE
-	hud.sync_sound_button()
 	hud.refresh_info()
 
 
@@ -325,9 +334,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		# Keys are looked up as actions, so rebinding needs no change here.
 		match Progress.action_for(event.keycode):
 			"cancel":
-				placing = ""
-				_select(null)
-				hud.refresh_info()
+				_escape()
 			"start_wave":
 				if not game_over and not in_wave:
 					_start_wave_early()
@@ -1391,36 +1398,53 @@ func _on_start_pressed() -> void:
 
 
 func _cycle_speed() -> void:
-	speed_index = (speed_index + 1) % SPEEDS.size()
-	hud.btn_speed.text = "%dx" % int(SPEEDS[speed_index])
+	if speeds.size() <= 1:
+		fx_text(Vector2(640.0, 210.0),
+				"Faster speeds unlock in the tech tree", Color("ffca28"), 18)
+		return
+	speed_index = (speed_index + 1) % speeds.size()
+	hud.btn_speed.text = "%dx" % int(speeds[speed_index])
 	if not paused:
-		Engine.time_scale = float(SPEEDS[speed_index])
+		Engine.time_scale = float(speeds[speed_index])
 
 
 ## Steps the mix between full, quiet and silent, and remembers the choice.
-func _cycle_volume() -> void:
-	var sfx := Progress.volume("sfx")
-	var step := 0
-	if sfx > 0.5:
-		step = 1
-	elif sfx > 0.001:
-		step = 2
-	var levels: Array = [[0.8, 0.35], [0.35, 0.15], [0.0, 0.0]]
-	var pick: Array = levels[step]
-	Progress.set_volume("sfx", float(pick[0]))
-	Progress.set_volume("music", float(pick[1]))
-	Audio.set_volumes(float(pick[0]), float(pick[1]))
-	hud.sync_sound_button()
-	Audio.play("click", -10.0, 0.0)
-
-
 func _toggle_auto() -> void:
 	auto_start = not auto_start
 	hud.btn_auto.text = "Auto ●" if auto_start else "Auto ○"
 	hud.btn_auto.modulate = Color("9ce89c") if auto_start else Color.WHITE
 
 
+## Escape always does the most useful thing available: shut whatever is
+## open, then let go of what is selected, and only then reach for the
+## pause menu.
+func _escape() -> void:
+	if tuning_panel != null and tuning_panel.visible:
+		tuning_panel.toggle()
+		return
+	if cheats != null and cheats.visible:
+		cheats.toggle()
+		return
+	if paused:
+		_toggle_pause()
+		return
+	if placing != "" or selected != null:
+		placing = ""
+		_select(null)
+		hud.refresh_info()
+		return
+	if not game_over:
+		_toggle_pause()
+
+
 func _toggle_pause() -> void:
 	paused = not paused
 	hud.btn_pause.text = "▶" if paused else "II"
-	Engine.time_scale = 0.0 if paused else float(SPEEDS[speed_index])
+	Engine.time_scale = 0.0 if paused else float(speeds[speed_index])
+	# Pausing is what opens the menu: there is no second "menu is open"
+	# state that could drift out of step with the clock.
+	if pause_menu != null:
+		if paused:
+			pause_menu.open()
+		else:
+			pause_menu.close()

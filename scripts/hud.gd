@@ -46,7 +46,6 @@ var lbl_over_title: Label
 var btn_continue: Button
 var over_panel: PanelContainer
 var btn_surrender: Button
-var btn_sound: Button
 var lbl_over: Label
 
 
@@ -243,7 +242,11 @@ func _build_topbar(root: Control) -> void:
 	row.add_child(btn_start)
 
 	btn_speed = _button("1x", 15, Vector2(46.0, 44.0))
-	btn_speed.tooltip_text = "Game speed (%s)" % Progress.key_name("speed")
+	btn_speed.tooltip_text = "Game speed (%s)" % Progress.key_name("speed") \
+			if game.speeds.size() > 1 \
+			else "Faster speeds unlock with Field Tempo in the tech tree"
+	btn_speed.modulate = Color.WHITE if game.speeds.size() > 1 \
+			else Color(0.55, 0.58, 0.64)
 	btn_speed.pressed.connect(game._cycle_speed)
 	row.add_child(btn_speed)
 
@@ -257,11 +260,6 @@ func _build_topbar(root: Control) -> void:
 			% Progress.key_name("auto")
 	btn_auto.pressed.connect(game._toggle_auto)
 	row.add_child(btn_auto)
-
-	btn_sound = _button("", 13, Vector2(48.0, 44.0))
-	btn_sound.tooltip_text = "Cycle volume: full, quiet, muted"
-	btn_sound.pressed.connect(game._cycle_volume)
-	row.add_child(btn_sound)
 
 	btn_surrender = _button("End run", 12, Vector2(64.0, 44.0))
 	btn_surrender.tooltip_text = "End this run now and collect what it earned"
@@ -601,12 +599,6 @@ func _build_game_over(root: Control) -> void:
 			Vector2(0.0, 38.0))
 	menu.pressed.connect(game._to_menu)
 	col.add_child(menu)
-
-
-func sync_sound_button() -> void:
-	var sfx := Progress.volume("sfx")
-	btn_sound.text = "Vol 3" if sfx > 0.5 else ("Vol 1" if sfx > 0.001 else "Mute")
-	btn_sound.modulate = Color.WHITE if sfx > 0.001 else Color(0.6, 0.62, 0.68)
 
 
 func update() -> void:

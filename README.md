@@ -127,6 +127,25 @@ price. Unlocks are gated by account level and by the tower's own prerequisites
 Everything here is permanent and applies on every map. The screen also has a
 two-step **Reset all progress** button.
 
+### Getting around
+
+Choosing a save slot lands on the **main menu** — continue the deepest
+parked run, play, tech tree, stats, options, switch slot, quit — rather
+than dropping straight into a list of maps with everything else hidden in a
+strip above it.
+
+**Escape always does the most useful thing available**, in that order: shut
+an open panel (tuning, cheats), close the pause menu, drop what you are
+placing or have selected, and only then pause. On any other screen it goes
+back one step.
+
+**Pause** (or Escape with nothing else to close) opens the pause menu:
+where the run stands, volume sliders for effects and music, then Resume,
+Restart, End run and Level select. Every way out unpauses first, so the
+next screen never inherits a frozen clock. Anything belonging to the
+account rather than the run — window size, key bindings — stays in Options,
+since going there would park the run.
+
 ### Reading the screen
 
 The top bar is split in two: **state on the left** — map, difficulty,
@@ -668,6 +687,13 @@ A runtime error in Godot is a log line, not a non-zero exit code, so
 `dev/run_checks.sh` runs every harness and fails on `SCRIPT ERROR` and parse
 errors as well as on any `FAIL`.
 
+### Game speed
+
+Fast-forward is earned, not assumed. Every account starts at 1x; **Field
+Tempo** in the tech tree unlocks 2x with its first rank and 3x with its
+second (`Progress.speeds()`). Until then the speed button says so rather
+than doing nothing.
+
 ### Balance tuning (F2)
 
 Balance is not fixed in code any more. **F2** during a match opens the
@@ -706,6 +732,13 @@ pegged back where it actually misbehaves. Values that differ from the table
 are shown in orange with the percentage change, and every row has its own
 `reset`. **Save** writes `user://td_mania_tuning.cfg`; **Revert** reloads it;
 **Reset all** empties both layers.
+
+**Export** and **Import** put a set of numbers in a file you can find, keep
+or send: `Export` writes readable JSON (dated, into `user://tuning/` by
+default, though the browser can go anywhere), and `Import` replaces the
+current numbers with a file written that way. Anything that is not one of
+ours is refused rather than silently wiping what you have, and an import is
+not saved until you press Save.
 
 Overrides live in that one file, never in a save slot, and deleting it
 restores the numbers in `data.gd`. The dev harnesses call

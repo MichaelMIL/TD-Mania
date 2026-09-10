@@ -68,6 +68,10 @@ static var TECH: Array = [
 	{"id": "salvage", "name": "Salvage Crew", "branch": 1, "requires": "bounty",
 		"max": 2, "cost": 75, "cost_mult": 1.8, "mods": {"sell_refund_add": 0.08},
 		"desc": "Selling a tower refunds more of what you paid."},
+	{"id": "tempo", "name": "Field Tempo", "branch": 1, "requires": "warchest",
+		"max": 2, "cost": 70, "cost_mult": 2.2, "mods": {},
+		"unlocks": ["Fast forward at 2x", "Fast forward at 3x"],
+		"desc": "Run the match faster. The first rank unlocks 2x, the second 3x."},
 	{"id": "logistics", "name": "Rapid Deployment", "branch": 1, "requires": "salvage",
 		"max": 2, "cost": 120, "cost_mult": 1.8, "mods": {"build_cost_mult": 0.94},
 		"desc": "Towers cost less to build."},
@@ -676,6 +680,22 @@ static func record_clear(level_id: String, waves: int) -> bool:
 	cleared[level_id] = maxi(int(cleared.get(level_id, 0)), waves)
 	save_state()
 	return first
+
+
+## Game speeds the account has earned. Everyone starts at 1x; the "tempo"
+## doctrine buys the faster ones, so fast-forward is something you unlock
+## rather than something the game hands over on the first map.
+static func speeds() -> Array:
+	load_state()
+	var out: Array = [1.0]
+	var rank_owned := rank("tempo")
+	if unlock_all:
+		rank_owned = maxi(rank_owned, 2)
+	if rank_owned >= 1:
+		out.append(2.0)
+	if rank_owned >= 2:
+		out.append(3.0)
+	return out
 
 
 static func best_wave(level_id: String) -> int:

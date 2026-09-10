@@ -33,6 +33,9 @@ var current: String = "gun"
 var scope_level: int = -1
 var tower_buttons: Dictionary = {}
 var value_fields: Dictionary = {}
+var file_dialog: FileDialog
+## Which way the open file browser is going.
+var exporting: bool = false
 var delta_labels: Dictionary = {}
 
 
@@ -127,6 +130,15 @@ func _build() -> void:
 	var wipe := _small_button("Reset all", 100.0)
 	wipe.pressed.connect(_reset_all)
 	scope_row.add_child(wipe)
+	# Somewhere you can find, keep and share a set of numbers.
+	var export_button := _small_button("Export", 84.0)
+	export_button.tooltip_text = "Write these numbers to a file you can keep or send"
+	export_button.pressed.connect(_export)
+	scope_row.add_child(export_button)
+	var import_button := _small_button("Import", 84.0)
+	import_button.tooltip_text = "Replace these numbers with a file you exported before"
+	import_button.pressed.connect(_import)
+	scope_row.add_child(import_button)
 
 	var mode_row := HBoxContainer.new()
 	mode_row.add_theme_constant_override("separation", 6)
@@ -404,6 +416,48 @@ func _reset_stat(key: String) -> void:
 	Tuning.clear_value(current, key, scope_level)
 	_after_change()
 	_say("%s back to the table value." % key)
+
+
+## Export and import both go through a file browser, so a set of numbers
+## can live outside the game's own data directory.
+func _browse(save_mode: bool) -> void:
+	if file_dialog == null:
+		file_dialog = FileDialog.new()
+		file_dialog.access = FileDialog.ACCESS_FILESYSTEM
+		file_dialog.filters = PackedStringArray(["*.json ; tuning files"])
+		file_dialog.size = Vector2i(720, 480)
+		file_dialog.file_selected.connect(_on_file_chosen)
+		add_child(file_dialog)
+	file_dialog.file_mode = FileDialog.FILE_MODE_SAVE_FILE if save_mode \
+			else FileDialog.FILE_MODE_OPEN_FILE
+	file_dialog.title = "Export tuning" if save_mode else "Import tuning"
+	exporting = save_mode
+	var suggested := Tuning.suggested_export_path()
+	file_dialog.current_dir = ProjectSettings.globalize_path(Tuning.EXPORT_DIR)
+	if save_mode:
+		file_dialog.current_file = suggested.get_file()
+	file_dialog.popup_centered()
+
+
+func _on_file_chosen(path: String) -> void:
+	if exporting:
+		_say("Exported to %s" % path if Tuning.export_to(path)
+				else "Could not write %s" % path)
+		return
+	if Tuning.import_from(path):
+		_build_rows()
+		_refresh_values()
+		_say("Imported %s. Nothing is saved until you press Save." % path.get_file())
+	else:
+		_say("%s is not a tuning export." % path.get_file())
+
+
+func _export() -> void:
+	_browse(true)
+
+
+func _import() -> void:
+	_browse(false)
 
 
 func _save() -> void:

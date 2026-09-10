@@ -3,7 +3,7 @@ extends Control
 ## Career page for the active save: lifetime totals, a per-tower table and a
 ## per-map table.
 
-const MENU_SCENE := "res://menu.tscn"
+const MENU_SCENE := "res://home.tscn"
 
 
 func _ready() -> void:
@@ -211,3 +211,11 @@ func _map_table() -> Control:
 			_row(rows, ["   " + str(d["name"]), mark, str(TDData.tier_of(d)["name"])], 13,
 					Color(1, 1, 1, 0.35) if locked else Color("e3f2fd"))
 	return parts[0]
+
+
+## Escape backs out of a screen, wherever you are.
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo \
+			and Progress.action_for(event.keycode) == "cancel":
+		get_viewport().set_input_as_handled()
+		get_tree().change_scene_to_file(MENU_SCENE)

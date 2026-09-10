@@ -3,7 +3,7 @@ extends Control
 ## Options: sound, window size and key bindings. Everything here is saved to
 ## the account slot the moment it changes, so there is no apply step.
 
-const MENU_SCENE := "res://menu.tscn"
+const MENU_SCENE := "res://home.tscn"
 
 var sfx_slider: HSlider
 var music_slider: HSlider
@@ -305,3 +305,11 @@ func _refresh() -> void:
 		var b: Button = key_rows[action]
 		b.text = "press a key…" if listening == action else Progress.key_name(action)
 		b.modulate = Color("ffd54f") if listening == action else Color.WHITE
+
+
+## Escape backs out of a screen, wherever you are.
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo \
+			and Progress.action_for(event.keycode) == "cancel":
+		get_viewport().set_input_as_handled()
+		get_tree().change_scene_to_file(MENU_SCENE)

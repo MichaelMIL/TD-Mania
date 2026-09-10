@@ -7,7 +7,7 @@ extends Control
 ## live here rather than inside a match, so they are bought once and apply to
 ## every tower of that type from the moment it is built.
 
-const MENU_SCENE := "res://menu.tscn"
+const MENU_SCENE := "res://home.tscn"
 
 var lbl_coins: Label
 var lbl_level: Label
@@ -188,8 +188,18 @@ func _global_card(t: Dictionary) -> Control:
 	var rank_label := _label("", 13, Color("ffd54f"))
 	head.add_child(rank_label)
 
-	var desc := _label("%s\n%s per rank" % [t["desc"], Progress.describe(t["mods"])], 12,
-			Color(1, 1, 1, 0.6))
+	# Most nodes change numbers; a few just unlock something, and saying
+	# "per rank" about those reads as a bug.
+	var effect: String = Progress.describe(t["mods"])
+	var unlocks: Array = t.get("unlocks", [])
+	var detail := "%s per rank" % effect if effect != "" \
+			else "Rank %d: %s" % [1, unlocks[0]] if unlocks.size() > 0 else ""
+	if effect == "" and unlocks.size() > 1:
+		var lines: Array = []
+		for i in unlocks.size():
+			lines.append("Rank %d: %s" % [i + 1, unlocks[i]])
+		detail = "\n".join(lines)
+	var desc := _label("%s\n%s" % [t["desc"], detail], 12, Color(1, 1, 1, 0.6))
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	col.add_child(desc)
@@ -420,3 +430,11 @@ func _refresh_track(card: PanelContainer) -> void:
 	buy.disabled = not bool(state["affordable"])
 	buy.text = "Unlock rank %d — %d coins" % [rank + 1, int(state["cost"])]
 	card.modulate = Color.WHITE
+
+
+## Escape backs out of a screen, wherever you are.
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo \
+			and Progress.action_for(event.keycode) == "cancel":
+		get_viewport().set_input_as_handled()
+		get_tree().change_scene_to_file(MENU_SCENE)

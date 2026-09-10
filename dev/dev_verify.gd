@@ -217,6 +217,7 @@ func _ready() -> void:
 	_check_wave_report()
 	_check_respec()
 	_check_options()
+	_check_menus()
 	_check_art_prompts()
 	_check_frame_budget()
 	_check_enemy_kinds()
@@ -1607,6 +1608,63 @@ func _check_art_prompts() -> void:
 	probe.queue_free()
 
 
+
+
+## The way around the game: a main menu, a pause menu, and an Escape key
+## that always does the most useful thing available.
+func _check_menus() -> void:
+	# Every screen exists and builds.
+	var missing: Array = []
+	for path: String in ["res://home.tscn", "res://menu.tscn", "res://options.tscn",
+			"res://tech.tscn", "res://stats.tscn", "res://main.tscn"]:
+		if not ResourceLoader.exists(path):
+			missing.append(path)
+	check("every screen exists (%s)" % ", ".join(missing), missing.is_empty())
+	var home: Control = load("res://home.tscn").instantiate()
+	add_child(home)
+	check("the main menu builds", home.get_child_count() > 0)
+	remove_child(home)
+	home.queue_free()
+
+	# The pause menu is part of a match, not a debug extra.
+	check("a match has a pause menu", game.pause_menu != null)
+	check("which starts closed", not game.pause_menu.visible)
+	var was_paused: bool = game.paused
+	if was_paused:
+		game._toggle_pause()
+	game._toggle_pause()
+	check("pausing opens it", game.paused and game.pause_menu.visible)
+	check("and stops the clock", is_zero_approx(Engine.time_scale))
+	game.pause_menu._resume()
+	check("resuming closes it and starts the clock",
+			not game.paused and not game.pause_menu.visible
+			and Engine.time_scale > 0.0)
+
+	# Volume lives on a slider now, not on a button that cycles three states.
+	check("the top bar has no volume button", not ("btn_sound" in game.hud))
+	var before_sfx := Progress.volume("sfx")
+	game.pause_menu._on_sfx(0.3)
+	check("the pause menu slider sets the volume",
+			is_equal_approx(Progress.volume("sfx"), 0.3))
+	Progress.set_volume("sfx", before_sfx)
+
+	# Escape: close what is open, then let go, then pause.
+	game.placing = "gun"
+	game._escape()
+	check("escape cancels what you were placing", game.placing == "")
+	game._escape()
+	check("with nothing to cancel it pauses", game.paused)
+	game._escape()
+	check("and again it resumes", not game.paused)
+	if game.tuning_panel != null:
+		game.tuning_panel.toggle()
+		game._escape()
+		check("an open panel closes before anything else happens",
+				not game.tuning_panel.visible and not game.paused)
+	if was_paused:
+		game._toggle_pause()
+
+
 ## Options: volumes, window scale and key bindings, including the swap that
 ## stops two actions sharing a key.
 func _check_options() -> void:
@@ -2559,6 +2617,43 @@ func _check_tuning() -> void:
 			TDData.track_cost("gun", 0, 1) == stock_second
 			and not TDData.tracks("gun")[0].has("rank_mods"))
 
+	# A set of numbers can leave the game and come back.
+	Tuning.clear_all()
+	Tuning.set_value("gun", "damage", 42.0, -1)
+	Tuning.set_value(Tuning.enemy_subject("tank"), "hp", 111.0, level)
+	Tuning.set_value(Tuning.track_subject("gun", 0), "cost#2", 77.0, -1)
+	var dump: Dictionary = Tuning.to_dictionary()
+	check("an export names its format", str(dump.get("format", "")) != ""
+			and dump.has("global") and dump.has("levels"))
+	var path := "user://tuning_export_test.json"
+	check("it writes", Tuning.export_to(path))
+	Tuning.clear_all()
+	check("and the numbers really were cleared",
+			is_equal_approx(float(TDData.tower_def("gun")["damage"]), base))
+	check("importing brings them back", Tuning.import_from(path))
+	check("towers included",
+			is_equal_approx(float(TDData.tower_def("gun")["damage"]), 42.0))
+	check("per-rank costs included", TDData.track_cost("gun", 0, 1) == 77)
+	var was_level := TDData.selected_level
+	TDData.selected_level = level
+	check("and per-level overrides land on their level",
+			is_equal_approx(float(TDData.enemy_def("tank")["hp"]), 111.0))
+	TDData.selected_level = was_level
+
+	# It must refuse anything that is not one of ours rather than wiping.
+	var junk := "user://tuning_export_junk.json"
+	var file := FileAccess.open(junk, FileAccess.WRITE)
+	file.store_string('{"format": "something else", "global": {}}')
+	file.close()
+	check("a foreign file is refused", not Tuning.import_from(junk))
+	check("and the current numbers survive the attempt",
+			is_equal_approx(float(TDData.tower_def("gun")["damage"]), 42.0))
+	check("a missing file is refused too",
+			not Tuning.import_from("user://not_here_at_all.json"))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(junk))
+	Tuning.clear_all()
+
 	# Back to the global layer; the scope was flipped a few lines above.
 	panel.scope_level = -1
 
@@ -3006,8 +3101,13 @@ func _check_tech() -> void:
 	var ok_shape := true
 	var roots := 0
 	for t: Dictionary in Progress.TECH:
+		# A node either changes numbers (mods) or unlocks something the
+		# game gates on its rank, and it always explains itself.
 		if int(t["max"]) < 1 or int(t["cost"]) < 1 or str(t["name"]) == "" \
-				or str(t["desc"]) == "" or (t["mods"] as Dictionary).is_empty():
+				or str(t["desc"]) == "":
+			ok_shape = false
+		if (t["mods"] as Dictionary).is_empty() \
+				and (t.get("unlocks", []) as Array).is_empty():
 			ok_shape = false
 		if str(t["requires"]) == "":
 			roots += 1
@@ -3017,6 +3117,22 @@ func _check_tech() -> void:
 				or Progress.describe(t["mods"]).contains("_add"):
 			ok_shape = false
 	check("every tech node is well formed and described", ok_shape)
+
+	# Game speed is something you buy, not something you start with.
+	Progress.use_clean_state()
+	Progress.read_only = true
+	Progress.unlock_all = false
+	Progress.ranks = {}
+	check("a new account plays at one speed", Progress.speeds() == [1.0])
+	Progress.ranks = {"tempo": 1}
+	check("the first rank of Field Tempo unlocks 2x",
+			Progress.speeds() == [1.0, 2.0])
+	Progress.ranks = {"tempo": 2}
+	check("and the second unlocks 3x", Progress.speeds() == [1.0, 2.0, 3.0])
+	var tempo: Dictionary = Progress.node("tempo")
+	check("the node says what it unlocks",
+			(tempo.get("unlocks", []) as Array).size() == int(tempo["max"]))
+	Progress.use_clean_state()
 	check("the tree has one root per branch", roots == 3)
 
 	check("a node with an unfinished parent is unavailable", not Progress.node_available("optics"))

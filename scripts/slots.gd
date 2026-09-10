@@ -3,7 +3,7 @@ extends Control
 ## Title screen: pick one of three save slots. Each slot keeps its own level,
 ## coins, tech and per-map records.
 
-const MENU_SCENE := "res://menu.tscn"
+const MENU_SCENE := "res://home.tscn"
 
 var cards: Dictionary = {}
 var armed_erase: int = -1

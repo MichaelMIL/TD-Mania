@@ -205,6 +205,7 @@ func _account_bar() -> Control:
 	bottom.add_child(gap)
 
 	for entry: Array in [
+		["Menu", "res://home.tscn", 84.0, "Back to the main menu (Escape)"],
 		["Slot %d" % (Progress.slot + 1), "res://main.tscn", 88.0,
 			"Switch save slot"],
 		["Options", "res://options.tscn", 92.0, "Sound, window size and keys"],
@@ -455,3 +456,11 @@ func _play(index: int, resume: bool = false) -> void:
 		# A fresh run only discards this map's own parked save.
 		Progress.clear_run(str(TDData.LEVELS[index]["id"]))
 	get_tree().change_scene_to_file(GAME_SCENE)
+
+
+## Escape goes back to the main menu.
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo \
+			and Progress.action_for(event.keycode) == "cancel":
+		get_viewport().set_input_as_handled()
+		get_tree().change_scene_to_file("res://home.tscn")

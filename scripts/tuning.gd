@@ -170,6 +170,99 @@ static func save_file() -> bool:
 	return cfg.save(FILE_PATH) == OK
 
 
+# ------------------------------------------------------------ import/export
+#
+# The working file lives in `user://`, which is buried inside the Godot
+# data directory. Export writes the same overrides somewhere you can find,
+# keep, diff or send to someone; import reads one back.
+
+const EXPORT_DIR := "user://tuning/"
+
+
+## Everything currently overridden, as a plain dictionary — the shape that
+## goes in an exported file.
+static func to_dictionary() -> Dictionary:
+	ensure_loaded()
+	var levels: Dictionary = {}
+	for level_id: int in level_values:
+		levels[str(level_id)] = (level_values[level_id] as Dictionary).duplicate(true)
+	return {
+		"format": "td_mania_tuning",
+		"version": 1,
+		"saved": Time.get_datetime_string_from_system(true),
+		"global": global_values.duplicate(true),
+		"levels": levels,
+	}
+
+
+## Replaces the current overrides with the contents of a dictionary. Returns
+## false for anything that is not one of ours.
+static func from_dictionary(data: Dictionary) -> bool:
+	if str(data.get("format", "")) != "td_mania_tuning":
+		return false
+	ensure_loaded()
+	global_values = {}
+	level_values = {}
+	var incoming: Dictionary = data.get("global", {})
+	for subject: String in incoming:
+		if incoming[subject] is Dictionary:
+			global_values[subject] = (incoming[subject] as Dictionary).duplicate(true)
+	var levels: Dictionary = data.get("levels", {})
+	for key: Variant in levels:
+		if not (levels[key] is Dictionary):
+			continue
+		var bucket: Dictionary = {}
+		for subject: String in levels[key]:
+			if levels[key][subject] is Dictionary:
+				bucket[subject] = (levels[key][subject] as Dictionary).duplicate(true)
+		if not bucket.is_empty():
+			level_values[int(str(key))] = bucket
+	version += 1
+	return true
+
+
+## Writes the overrides to `path` as readable JSON.
+static func export_to(path: String) -> bool:
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_string(JSON.stringify(to_dictionary(), "\t"))
+	file.close()
+	return true
+
+
+## Reads a file written by `export_to`. Refuses anything else, so a stray
+## JSON file cannot silently wipe the current numbers.
+static func import_from(path: String) -> bool:
+	if not FileAccess.file_exists(path):
+		return false
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not (parsed is Dictionary):
+		return false
+	return from_dictionary(parsed as Dictionary)
+
+
+## A dated filename inside the export folder, which is created on demand.
+static func suggested_export_path() -> String:
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(EXPORT_DIR))
+	var stamp := Time.get_datetime_string_from_system(true).replace(":", "-")
+	return "%stuning_%s.json" % [EXPORT_DIR, stamp]
+
+
+## Exports already written, newest first, so the panel can offer them.
+static func exported_files() -> Array:
+	var out: Array = []
+	var dir := DirAccess.open(EXPORT_DIR)
+	if dir == null:
+		return out
+	for name: String in dir.get_files():
+		if name.ends_with(".json"):
+			out.append(EXPORT_DIR + name)
+	out.sort()
+	out.reverse()
+	return out
+
+
 ## True when the file on disk still matches what is in memory.
 static func has_overrides() -> bool:
 	return not global_values.is_empty() or not level_values.is_empty()
