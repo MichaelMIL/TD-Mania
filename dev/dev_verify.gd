@@ -214,6 +214,7 @@ func _ready() -> void:
 	_check_board_tooltips()
 	_check_objectives()
 	_check_victory()
+	_check_wave_report()
 	_check_respec()
 	_check_options()
 	_check_art_prompts()
@@ -1731,6 +1732,62 @@ func _check_respec() -> void:
 	Progress.use_clean_state()
 
 
+
+
+
+
+## A leak with no explanation teaches nothing. After every wave the game
+## says what got through and what answers it.
+func _check_wave_report() -> void:
+	var saved_stats: Dictionary = game.run_stats.duplicate(true)
+	var saved_wave: int = game.wave
+	var was_cleared: bool = game.map_cleared
+	game.map_cleared = true  # keep the victory panel out of this test
+	game.wave = 6
+	game.wave_leaks = {}
+	game.run_stats["untouched"] = true
+	game._build_wave_report()
+	check("a clean wave is reported as clean",
+			game.wave_report.contains("without losing a life"))
+	check("and the line is shown for a while", game.wave_report_timer > 1.0)
+
+	game.wave_leaks = {"warden": 2, "grunt": 1}
+	game._build_wave_report()
+	check("a leaky wave counts what got through",
+			game.wave_report.contains("3 got through"))
+	check("and names them", game.wave_report.contains("Warden")
+			and game.wave_report.contains("Grunt"))
+	check("then explains the worst of them",
+			game.wave_report.contains(str(TDData.ENEMIES["warden"]["note"])))
+
+	# The status line has to actually show it during the build phase.
+	game.in_wave = false
+	game.game_over = false
+	game.hud.update()
+	check("the report is on screen over the board",
+			str(game.hud.lbl_status.text).contains("got through"))
+	game.wave_report_timer = 0.0
+	game.hud.update()
+	check("and gives way to the countdown after a few seconds",
+			not str(game.hud.lbl_status.text).contains("got through"))
+
+	# Defeat should say what was killing you, not just that you died.
+	game.run_stats["enemy_leaks"] = {"ashwalker": 7, "grunt": 2}
+	var summary: String = game.leak_summary()
+	check("the defeat card names what got past you",
+			summary.contains("7 Ashwalker") and summary.contains("2 Grunt"))
+	check("worst first", summary.find("Ashwalker") < summary.find("Grunt"))
+	check("with the counter for it",
+			summary.contains(str(TDData.ENEMIES["ashwalker"]["note"])))
+	game.run_stats["enemy_leaks"] = {}
+	check("and says nothing when nothing leaked", game.leak_summary() == "")
+
+	game.run_stats = saved_stats
+	game.wave = saved_wave
+	game.map_cleared = was_cleared
+	game.wave_leaks = {}
+	game.wave_report = ""
+	game.wave_report_timer = 0.0
 
 
 ## A map can be finished. Reaching its last wave is a win that sticks, and

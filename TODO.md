@@ -155,6 +155,13 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
       playing — endless** button that carries the same board on, since the
       clear sticks whatever happens afterwards.
 
+- [x] **Say why you are losing.** *Implemented 2026-09-10.* Each build
+      phase opens with a report on the wave just played — what got through,
+      counted and named worst-first, plus the roster note that answers it
+      ("Warden: Slabs of plate. Only armor-piercing fire really hurts it").
+      A wave that cost nothing says so. The defeat card carries the same
+      summary for the whole run, so a loss explains itself.
+
 ## Do last
 
 - [x] **Cut what the game costs the machine.** *Implemented 2026-09-10.*

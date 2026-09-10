@@ -619,6 +619,10 @@ func update() -> void:
 		else:
 			lbl_status.text = "Next wave in %.1fs — Start now for +$%d bonus (%s)%s" \
 					% [maxf(0.0, game.break_timer), bonus, Progress.key_name("start_wave"), from]
+		# For the first seconds of the break, what just happened matters more
+		# than the countdown to what is next.
+		if game.wave_report_timer > 0.0 and game.wave_report != "":
+			lbl_status.text = game.wave_report
 		btn_start.disabled = false
 		btn_start.text = "Start Wave"
 	refresh_wave_preview()

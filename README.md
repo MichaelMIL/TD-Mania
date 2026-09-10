@@ -364,6 +364,18 @@ then an outer ring as the total investment rises.
 | Helipad | Autocannon (4), Ammo Belts (3), Uprated Rotors (3), Wing Escort (1) | — |
 | Command Post | Doctrine (3), Logistics (3), Comms Array (3) | — |
 
+### Why you are losing
+
+A leak used to be a red number and nothing else. For the first eight
+seconds of each build phase the line above the board reports the wave just
+played — "Wave 12: 3 got through (2 Warden, 1 Bolt). Warden: Slabs of
+plate. Only armor-piercing fire really hurts it." — naming what breached,
+worst first, and what actually answers it. A wave that cost nothing says so
+instead.
+
+The defeat card gets the same treatment for the run as a whole: the three
+kinds that got past you most often, and the counter for the worst of them.
+
 ### Clearing a map
 
 Every map has a finish line: wave 25 on Easy down to wave 20 on Brutal

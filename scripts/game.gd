@@ -81,6 +81,11 @@ var surrendered: bool = false
 ## Set once the map's last wave has been beaten. The run can carry on into
 ## endless afterwards, which is why this is separate from `game_over`.
 var map_cleared: bool = false
+## What got through during the wave just played, and the line the HUD shows
+## about it. A leak with no explanation teaches nothing.
+var wave_leaks: Dictionary = {}
+var wave_report: String = ""
+var wave_report_timer: float = 0.0
 ## Set when a developer cheat is used; keeps the run out of the record books.
 var cheats_used: bool = false
 var cheats: Cheats
@@ -541,6 +546,8 @@ func _process(delta: float) -> void:
 		elif break_timer <= 0.0:
 			_start_wave()
 	hud.update()
+	if wave_report_timer > 0.0:
+		wave_report_timer = maxf(0.0, wave_report_timer - delta)
 	# Gold peaks mid-wave, so the "hold $N" objective is watched live.
 	run_stats["peak_gold"] = maxi(int(run_stats.get("peak_gold", 0)), gold)
 	# Creeps walk out from under a still cursor, so the card is re-checked
@@ -563,6 +570,9 @@ func _process_menders(delta: float) -> void:
 
 func _start_wave() -> void:
 	wave += 1
+	wave_leaks = {}
+	wave_report = ""
+	wave_report_timer = 0.0
 	spawn_queue = _build_wave(wave)
 	spawn_index = 0
 	wave_time = 0.0
@@ -651,6 +661,7 @@ func _end_wave() -> void:
 	fx_text(Vector2(640.0, 130.0), "Wave %d cleared  +$%d" % [wave, bonus], Color("66bb6a"), 24)
 	run_stats["peak_gold"] = maxi(int(run_stats.get("peak_gold", 0)), gold)
 	_award_stars()
+	_build_wave_report()
 	if not map_cleared and wave >= TDData.clear_wave(level_def):
 		_trigger_victory()
 
@@ -660,6 +671,38 @@ func _end_wave() -> void:
 ## Builds one wave from the rule table in `data.gd` — the level's area can
 ## bend those rules, which is what makes the Wastes feel unlike the
 ## Greenlands. Boss waves ignore the table and run their own shape.
+## One line about the wave just played: what got through, and what to do
+## about it. Shown over the board for the first stretch of the build phase.
+const REPORT_TIME := 8.0
+
+
+func _build_wave_report() -> void:
+	wave_report_timer = REPORT_TIME
+	if wave_leaks.is_empty():
+		wave_report = "Wave %d cleared without losing a life." % wave \
+				if bool(run_stats.get("untouched", true)) \
+				else "Wave %d cleared — nothing got through." % wave
+		return
+	# Name the worst offender and say what actually answers it.
+	var worst := ""
+	var worst_count := 0
+	var total := 0
+	var parts: Array = []
+	for kind: String in TDData.ENEMIES:
+		if not wave_leaks.has(kind):
+			continue
+		var count := int(wave_leaks[kind])
+		total += count
+		parts.append("%d %s" % [count, TDData.ENEMIES[kind]["name"]])
+		if count > worst_count:
+			worst_count = count
+			worst = kind
+	wave_report = "Wave %d: %d got through (%s)." % [wave, total, ", ".join(parts)]
+	var tip := str(TDData.ENEMIES[worst].get("note", ""))
+	if tip != "":
+		wave_report += "  %s: %s" % [TDData.ENEMIES[worst]["name"], tip]
+
+
 func _build_wave(n: int) -> Array:
 	var hp_mult := pow(1.125, float(n - 1)) * (1.0 + 0.012 * float(max(0, n - 12))) \
 			* TDData.level_stat(level_def, "hp_scale")
@@ -822,6 +865,7 @@ func _on_enemy_leaked(e: Enemy) -> void:
 	if not Cheats.god_mode:
 		lives -= e.leak_damage
 		run_stats["untouched"] = false
+	wave_leaks[e.kind] = int(wave_leaks.get(e.kind, 0)) + 1
 	if e.steal_gold > 0 and gold > 0 and not Cheats.god_mode:
 		# Cutpurses take gold on their way past.
 		var stolen: int = mini(gold, e.steal_gold)
@@ -1019,6 +1063,9 @@ func _trigger_game_over() -> void:
 			occupied.size(), leaked_total,
 			"New record!" if record else "Best on this map: wave %d" % best_wave, payout,
 			objective_summary()]
+	var breached := leak_summary()
+	if breached != "":
+		hud.lbl_over.text += "\n" + breached
 	hud.update()
 	if surrendered:
 		hud.lbl_over_title.text = "Run ended"
@@ -1312,6 +1359,24 @@ func objective_lines(short: bool = false) -> Array:
 			mark = "✓"
 		out.append("%s %s" % [mark, str(goal["short"] if short else goal["text"])])
 	return out
+
+
+## What got past the towers over the whole run, worst first. This is
+## usually the answer to "why did I lose".
+func leak_summary() -> String:
+	var leaks: Dictionary = run_stats.get("enemy_leaks", {})
+	if leaks.is_empty():
+		return ""
+	var kinds: Array = leaks.keys()
+	kinds.sort_custom(func(a, b): return int(leaks[a]) > int(leaks[b]))
+	var parts: Array = []
+	for kind: String in kinds.slice(0, 3):
+		parts.append("%d %s" % [int(leaks[kind]), TDData.ENEMIES[kind]["name"]])
+	var text := "Got past you: %s." % ", ".join(parts)
+	var tip := str(TDData.ENEMIES[str(kinds[0])].get("note", ""))
+	if tip != "":
+		text += "  %s" % tip
+	return text
 
 
 func objective_summary() -> String:
