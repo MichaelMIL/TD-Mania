@@ -29,6 +29,10 @@ func _ready() -> void:
 	Engine.max_fps = 0
 
 	var args: PackedStringArray = OS.get_cmdline_user_args()
+	if args.has("--churn"):
+		_measure_churn()
+		get_tree().quit()
+		return
 	var wave := 12
 	var towers := 0
 	for i in args.size():
@@ -65,6 +69,39 @@ func _ready() -> void:
 	if off.has("enemies"):
 		freeze_enemies = true
 	print("[PERF] %d towers, wave %d, vsync off" % [game.occupied.size(), wave])
+
+
+## How much a wave costs simply in creeps arriving and leaving: allocate,
+## set up, walk a frame, and free. Run before deciding whether pooling is
+## worth the stale-state risk.
+##
+##   godot --headless --quit-after 200 dev/dev_perf.tscn -- --churn
+func _measure_churn() -> void:
+	var road: PackedVector2Array = game.routes[0]
+	var rounds := 20
+	var per_round := 200
+	var made_us := 0
+	var freed_us := 0
+	for r in rounds:
+		var batch: Array = []
+		var t0 := Time.get_ticks_usec()
+		for i in per_round:
+			var e := Enemy.new()
+			e.setup("grunt", 1.0, 1.0, road)
+			game.layer_enemies.add_child(e)
+			batch.append(e)
+		made_us += Time.get_ticks_usec() - t0
+		t0 = Time.get_ticks_usec()
+		for e: Enemy in batch:
+			game.layer_enemies.remove_child(e)
+			e.free()
+		freed_us += Time.get_ticks_usec() - t0
+	var total := float(made_us + freed_us) / float(rounds) / 1000.0
+	print("[CHURN] %d creeps: %.2f ms to create, %.2f ms to free, %.2f ms a wave's worth"
+			% [per_round, float(made_us) / float(rounds) / 1000.0,
+			float(freed_us) / float(rounds) / 1000.0, total])
+	print("[CHURN] a heavy wave spawns about 70 creeps over ~45 s, so that is roughly %.3f ms per second of play"
+			% (total * 70.0 / float(per_round) / 45.0))
 
 
 func _build_some(count: int) -> void:

@@ -677,8 +677,9 @@ scripts/app.gd            frame cap and background throttling (autoloaded)
 and a wave in flight, vsync off and the frame cap lifted, reporting average
 and 95th-percentile frame time, script time, draw calls and node count.
 `-- --off towers,draw,hud,water,enemies` silences parts of the frame so the
-cost can be attributed rather than guessed at, and `--towers N` / `--wave N`
-set the scenario.
+cost can be attributed rather than guessed at, `--towers N` / `--wave N`
+set the scenario, and `--churn` prices creeps arriving and leaving (about
+0.009 ms per second of play, which is why they are not pooled).
 
 That is how the real cost was found: a saturated board ran at 20 fps
 (48.8 ms a frame), and hiding the tower layer took it to 4.3 ms — so the

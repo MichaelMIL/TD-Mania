@@ -95,11 +95,15 @@ harnesses.
       but a real run does not record its seed, so "look what happened"
       cannot be replayed. Store the seed in the run state and reuse it on
       resume.
-- [ ] **Creeps are allocated and freed every wave.** A late wave spawns and
-      frees hundreds of nodes. Pooling them in `game.gd` would cut the
-      allocation churn sitting underneath the draw cost. Measure with
-      `dev/dev_perf.tscn` before and after — the last round of performance
-      work came from measuring first, and this should too.
+- [x] **Creeps are allocated and freed every wave.** *Measured 2026-09-11,
+      and left alone.* `dev/dev_perf.tscn -- --churn` creates, sets up and
+      frees 200 creeps: 0.95 ms to make them, 0.27 ms to free them. A heavy
+      wave spawns about 70 creeps over 45 seconds, which works out at
+      **0.009 ms per second of play** — nothing. Pooling would buy that
+      back in exchange for reusing nodes with stale state, which is the
+      exact class of bug that produced the freed-object crashes. Not worth
+      it; the benchmark stays so the decision can be re-checked if creep
+      counts ever change by an order of magnitude.
 
 ## Notes
 
