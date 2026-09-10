@@ -14,7 +14,10 @@ func _process(_delta: float) -> void:
 
 
 func _draw() -> void:
-	if game == null or game.placing == "":
+	if game == null:
+		return
+	if game.placing == "":
+		_draw_preview()
 		return
 	var cell: Vector2i = game.hover_cell
 	if not game.in_bounds(cell):
@@ -52,3 +55,31 @@ func _draw() -> void:
 				draw_rect(r.grow(-3.0), Color(tint.r, tint.g, tint.b, 0.14))
 				draw_rect(r.grow(-3.0), Color(tint.r, tint.g, tint.b, 0.45 + 0.35 * pulse),
 						false, 2.0)
+
+
+## What a tower would do from here, drawn while its palette card is hovered:
+## every cell it could stand on, and the reach from the last cell the mouse
+## was over. Nothing is committed, so it is drawn fainter than the real
+## placement cursor.
+func _draw_preview() -> void:
+	var type_id: String = game.preview_tower
+	if type_id == "" or not TDData.TOWERS.has(type_id):
+		return
+	var d: Dictionary = TDData.tower_def(type_id)
+	var tint: Color = d["color"]
+	var size := float(TDData.CELL)
+	for key: Vector2i in game.terrain:
+		if not game.can_place(key, type_id):
+			continue
+		var at: Vector2 = game.cell_center(key)
+		draw_rect(Rect2(at - Vector2(size, size) * 0.5, Vector2(size, size)),
+				Color(tint.r, tint.g, tint.b, 0.07))
+	if not game.in_bounds(game.hover_cell):
+		return
+	var pos: Vector2 = game.cell_center(game.hover_cell)
+	var rng := float(d["range"])
+	draw_circle(pos, rng, Color(tint.r, tint.g, tint.b, 0.05))
+	draw_arc(pos, rng, 0.0, TAU, 64, Color(tint.r, tint.g, tint.b, 0.35), 1.5, true)
+	var dead := float(d.get("min_range", 0.0))
+	if dead > 0.0:
+		draw_arc(pos, dead, 0.0, TAU, 40, Color(0.95, 0.4, 0.4, 0.35), 1.5, true)

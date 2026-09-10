@@ -656,6 +656,13 @@ func _check_drag() -> void:
 		if game.can_place(key, "gun"):
 			spot = key
 			break
+	# Hovering a palette card previews the tower without buying it.
+	game.hud._hover_card("mortar")
+	check("hovering a card arms the preview", game.preview_tower == "mortar")
+	check("but does not arm placement", game.placing == "")
+	game.hud._hover_card("")
+	check("and leaving the card drops it", game.preview_tower == "")
+
 	game.begin_drag("gun")
 	check("drag starts with the tower armed", game.dragging and game.placing == "gun")
 	check("map rect covers the board", game.map_rect().has_point(game.cell_center(spot)))

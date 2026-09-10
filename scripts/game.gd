@@ -38,6 +38,9 @@ var auto_start: bool = false
 var early_claimed: int = 0
 
 var placing: String = ""
+## The palette card being hovered, if any. Shows the tower's reach on the
+## board before you commit to buying it.
+var preview_tower: String = ""
 var dragging: bool = false
 var selected: Tower = null
 var hover_cell: Vector2i = Vector2i(-99, -99)

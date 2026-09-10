@@ -328,8 +328,8 @@ func _palette_card(type_id: String, index: int) -> Control:
 	card.tooltip_text = "%s  $%d\n%s" % [d["name"], int(d["cost"]), d["desc"]]
 	card.add_theme_stylebox_override("panel", _sb(Color("16202e"), Color("32425c"), 6))
 	card.gui_input.connect(_palette_input.bind(type_id))
-	card.mouse_entered.connect(refresh_info.bind(type_id))
-	card.mouse_exited.connect(refresh_info)
+	card.mouse_entered.connect(_hover_card.bind(type_id))
+	card.mouse_exited.connect(_hover_card.bind(""))
 
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 1)
@@ -362,6 +362,15 @@ func _palette_card(type_id: String, index: int) -> Control:
 
 	palette_cards[type_id] = card
 	return card
+
+
+## Hovering a card previews the tower on the board — where it may stand and
+## how far it reaches — before any gold is spent.
+func _hover_card(type_id: String) -> void:
+	game.preview_tower = type_id
+	if game.cursor != null:
+		game.cursor.queue_redraw()
+	refresh_info(type_id)
 
 
 func _palette_input(event: InputEvent, type_id: String) -> void:
