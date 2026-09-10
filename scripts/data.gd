@@ -79,6 +79,148 @@ static var AREAS: Array = [
 ]
 
 
+## ------------------------------------------------------------ wave tables
+##
+## A wave is built by walking these rules in order. A rule contributes a
+## group of one creep kind:
+##
+##   from         first wave it can appear on
+##   every/offset only on waves where n % every == offset (1 = every wave)
+##   count        group size, plus n / count_every, plus n * count_mult
+##   gap          seconds between its creeps, moving by gap_ramp a wave and
+##                never below gap_min
+##   lead         pause before the group starts
+##
+## Order matters: groups are laid down one after another, so the list reads
+## top to bottom as the shape of the wave.
+static var WAVE_RULES: Array = [
+	{"kind": "grunt", "from": 1, "count": 4, "count_mult": 1.2,
+		"gap": 1.0, "gap_ramp": -0.03, "gap_min": 0.4, "lead": 0.0},
+	{"kind": "runner", "from": 4, "count": 2, "count_mult": 0.5,
+		"gap": 0.5, "lead": 1.4},
+	{"kind": "swarm", "from": 6, "every": 2, "offset": 0, "count": 6,
+		"count_every": 2, "gap": 0.25, "lead": 1.2},
+	{"kind": "bolt", "from": 6, "count": 1, "count_every": 6,
+		"gap": 0.55, "lead": 1.0},
+	{"kind": "brood", "from": 7, "every": 3, "offset": 1, "count": 1,
+		"count_every": 8, "gap": 1.1, "lead": 1.2},
+	{"kind": "ashwalker", "from": 8, "every": 3, "offset": 2, "count": 1,
+		"count_every": 7, "gap": 0.7, "lead": 1.0},
+	{"kind": "mender", "from": 9, "every": 2, "offset": 1, "count": 1,
+		"count_every": 8, "gap": 1.6, "lead": 1.4},
+	{"kind": "thief", "from": 10, "every": 4, "offset": 0, "count": 1,
+		"count_every": 9, "gap": 0.5, "lead": 1.0},
+	{"kind": "warden", "from": 12, "count": 1, "count_every": 14,
+		"gap": 2.0, "lead": 1.6},
+	{"kind": "tank", "from": 6, "count": 1, "count_every": 5,
+		"gap": 1.8, "lead": 1.5},
+]
+
+## Every tenth wave replaces the rules with an escorted heavy.
+static var BOSS_WAVE: Dictionary = {
+	"escort": {"kind": "grunt", "count": 6, "count_every": 2, "gap": 0.55},
+	"pause": 1.5,
+	"kind": "boss",
+	## From wave 20 every other boss wave sends the bigger one instead.
+	"alt_kind": "titan", "alt_from": 20, "alt_cycle": 2,
+	"hp_step": 0.12, "after": 2.0,
+	"trail": {"kind": "runner", "count": 4, "count_every": 5, "gap": 0.4},
+}
+
+## Per-area flavour, layered on WAVE_RULES: `tweak` edits a kind's rule,
+## `add` appends a group, `drop` removes a kind entirely. This is what makes
+## the Wastes feel unlike the Greenlands without touching the base curve.
+static var AREA_WAVES: Dictionary = {
+	"greenlands": {},
+	"riverlands": {
+		# River country runs fast and light: more sprinters, fewer swarms.
+		"tweak": {
+			"bolt": {"from": 4, "count": 2, "count_every": 5},
+			"swarm": {"count": 4},
+			"runner": {"count_mult": 0.7},
+		},
+	},
+	"wastes": {
+		# Ash country: burning does nothing to what already lives in fire.
+		"tweak": {
+			"ashwalker": {"from": 4, "every": 2, "offset": 0, "count": 2,
+				"count_every": 5},
+			"tank": {"count_every": 4},
+			"swarm": {"from": 8},
+		},
+		# A second ash pack rolls in behind the first on the deep waves.
+		"add": [
+			{"kind": "ashwalker", "from": 12, "every": 4, "offset": 0, "count": 2,
+				"count_every": 8, "gap": 0.6, "lead": 1.2},
+		],
+	},
+	"frozen": {
+		# Armour and healers: the coast punishes a defence that cannot focus.
+		"tweak": {
+			"warden": {"from": 9, "count_every": 10},
+			"mender": {"from": 7, "every": 2, "offset": 1, "count_every": 6},
+			"grunt": {"count_mult": 1.0},
+		},
+	},
+	"delta": {
+		# Everything, sooner, and thieves working the foundry gates.
+		"tweak": {
+			"thief": {"from": 6, "every": 2, "offset": 0, "count_every": 7},
+			"brood": {"from": 6, "every": 2, "offset": 1},
+			"warden": {"from": 10, "count_every": 11},
+			"grunt": {"count_mult": 1.35},
+		},
+		# The foundry gates send a second armoured column late on.
+		"add": [
+			{"kind": "warden", "from": 16, "every": 3, "offset": 0, "count": 1,
+				"count_every": 16, "gap": 2.2, "lead": 1.8},
+		],
+	},
+}
+
+
+## The rule list a level plays by: the base table with its area's flavour
+## layered on top.
+static func wave_rules(area_id: String) -> Array:
+	var flavour: Dictionary = AREA_WAVES.get(area_id, {})
+	if flavour.is_empty():
+		return WAVE_RULES
+	var drop: Array = flavour.get("drop", [])
+	var tweak: Dictionary = flavour.get("tweak", {})
+	var out: Array = []
+	for rule: Dictionary in WAVE_RULES:
+		var kind := str(rule["kind"])
+		if drop.has(kind):
+			continue
+		if tweak.has(kind):
+			var merged: Dictionary = rule.duplicate(true)
+			merged.merge(tweak[kind], true)
+			out.append(merged)
+		else:
+			out.append(rule)
+	for extra: Dictionary in flavour.get("add", []):
+		out.append(extra)
+	return out
+
+
+## Size of one group on wave `n`.
+static func wave_group_count(rule: Dictionary, n: int) -> int:
+	var count := int(rule.get("count", 1))
+	if int(rule.get("count_every", 0)) > 0:
+		count += n / int(rule["count_every"])
+	if float(rule.get("count_mult", 0.0)) > 0.0:
+		count += int(float(n) * float(rule["count_mult"]))
+	return maxi(0, count)
+
+
+## Whether a rule contributes anything to wave `n`.
+static func wave_rule_active(rule: Dictionary, n: int) -> bool:
+	if n < int(rule.get("from", 1)):
+		return false
+	var every := int(rule.get("every", 1))
+	return every <= 1 or n % every == int(rule.get("offset", 0))
+
+
 static func area_of(level: Dictionary) -> Dictionary:
 	for a: Dictionary in AREAS:
 		if str(a["id"]) == str(level.get("area", "")):

@@ -58,10 +58,15 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
       as you can". Add goals like *survive 15 waves*, *lose no lives*, *clear
       it without water towers*, stored per map in `progress.gd` alongside the
       best-wave record.
-- [ ] **Data-driven waves.** `_build_wave()` is 13 hardcoded
-      `if n >= X and n % Y == Z` rules. Move to a table, optionally per area,
-      so the Wastes can feel different from the Greenlands and tuning stops
-      being surgery.
+- [x] **Data-driven waves.** *Implemented 2026-09-10.* `_build_wave()` is a
+      loop over `TDData.WAVE_RULES` / `BOSS_WAVE` — one rule per creep kind
+      with `from`, `every`/`offset`, group size, spacing and lead-in.
+      `AREA_WAVES` layers per-area flavour on top (`tweak` a kind, `add` a
+      group, `drop` one), so the Wastes send early ashwalkers in packs, the
+      Riverlands run fast and light, the Frozen Coast leans on armour and
+      menders, and the Delta throws more of everything sooner. The base
+      curve is byte-identical to the old hardcoded builder, pinned by golden
+      compositions in the suite, and `dev/dev_waves.tscn` prints the curve.
 - [ ] **Tech respec.** Coins are spent permanently with no way to experiment.
       A paid respec button on the tech screen would encourage trying builds.
 

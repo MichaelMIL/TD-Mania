@@ -344,6 +344,23 @@ then an outer ring as the total investment rises.
 | Helipad | Autocannon (4), Ammo Belts (3), Uprated Rotors (3), Wing Escort (1) | — |
 | Command Post | Doctrine (3), Logistics (3), Comms Array (3) | — |
 
+### Wave tables
+
+Waves are built from data, not code: `TDData.WAVE_RULES` holds one rule per
+creep kind — the first wave it appears on, an optional `every`/`offset`
+cadence, how the group grows with the wave, the spacing between its creeps
+and the pause before it starts. `BOSS_WAVE` describes every tenth wave.
+
+`AREA_WAVES` layers flavour per area: `tweak` edits a kind's rule, `add`
+appends a group, `drop` removes one. That is what makes the Wastes send
+ashwalkers early and in packs while the Riverlands run fast and light, with
+no change to the underlying curve. Print any of it with:
+
+```bash
+godot --headless --quit-after 300 dev/dev_waves.tscn                  # all areas
+godot --headless --quit-after 300 dev/dev_waves.tscn -- --area wastes # one area
+```
+
 ### Enemies
 
 Twelve kinds walk the road, and most of them exist to punish a one-note

@@ -610,6 +610,9 @@ func _end_wave() -> void:
 
 ## Builds a flat, time-stamped spawn list for the given wave number, scaled by
 ## the level's difficulty knobs.
+## Builds one wave from the rule table in `data.gd` — the level's area can
+## bend those rules, which is what makes the Wastes feel unlike the
+## Greenlands. Boss waves ignore the table and run their own shape.
 func _build_wave(n: int) -> Array:
 	var hp_mult := pow(1.125, float(n - 1)) * (1.0 + 0.012 * float(max(0, n - 12))) \
 			* TDData.level_stat(level_def, "hp_scale")
@@ -619,80 +622,41 @@ func _build_wave(n: int) -> Array:
 	var t := 0.0
 
 	if n % 10 == 0:
-		# Boss wave: escorts first, then the behemoth — or a Titan later on.
-		for i in 6 + n / 2:
-			entries.append({"kind": "grunt", "t": t, "hp": hp_mult, "spd": speed_mult})
-			t += 0.55
-		t += 1.5
-		var big := "titan" if n >= 20 and (n / 10) % 2 == 0 else "boss"
+		var boss: Dictionary = TDData.BOSS_WAVE
+		var escort: Dictionary = boss["escort"]
+		for i in TDData.wave_group_count(escort, n):
+			entries.append({"kind": str(escort["kind"]), "t": t, "hp": hp_mult,
+					"spd": speed_mult})
+			t += float(escort["gap"])
+		t += float(boss["pause"])
+		var big := str(boss["kind"])
+		if n >= int(boss["alt_from"]) and (n / 10) % int(boss["alt_cycle"]) == 0:
+			big = str(boss["alt_kind"])
 		entries.append({"kind": big, "t": t,
-				"hp": hp_mult * (1.0 + 0.12 * float(n / 10 - 1)), "spd": speed_mult})
-		t += 2.0
-		for i in 4 + n / 5:
-			entries.append({"kind": "runner", "t": t, "hp": hp_mult, "spd": speed_mult})
-			t += 0.4
+				"hp": hp_mult * (1.0 + float(boss["hp_step"]) * float(n / 10 - 1)),
+				"spd": speed_mult})
+		t += float(boss["after"])
+		var trail: Dictionary = boss["trail"]
+		for i in TDData.wave_group_count(trail, n):
+			entries.append({"kind": str(trail["kind"]), "t": t, "hp": hp_mult,
+					"spd": speed_mult})
+			t += float(trail["gap"])
 		_assign_routes(entries, wave_lanes(n))
 		return entries
 
-	var grunts := 4 + int(float(n) * 1.2)
-	for i in grunts:
-		entries.append({"kind": "grunt", "t": t, "hp": hp_mult, "spd": speed_mult})
-		t += maxf(0.4, 1.0 - 0.03 * float(n))
-
-	if n >= 4:
-		t += 1.4
-		for i in 2 + int(float(n) * 0.5):
-			entries.append({"kind": "runner", "t": t, "hp": hp_mult, "spd": speed_mult})
-			t += 0.5
-
-	if n >= 6 and n % 2 == 0:
-		t += 1.2
-		for i in 6 + n / 2:
-			entries.append({"kind": "swarm", "t": t, "hp": hp_mult, "spd": speed_mult})
-			t += 0.25
-
-	# Sprinters show up early, then the specialists arrive one kind at a time.
-	if n >= 6:
-		t += 1.0
-		for i in 1 + n / 6:
-			entries.append({"kind": "bolt", "t": t, "hp": hp_mult, "spd": speed_mult})
-			t += 0.55
-
-	if n >= 7 and n % 3 == 1:
-		t += 1.2
-		for i in 1 + n / 8:
-			entries.append({"kind": "brood", "t": t, "hp": hp_mult, "spd": speed_mult})
-			t += 1.1
-
-	if n >= 8 and n % 3 == 2:
-		t += 1.0
-		for i in 1 + n / 7:
-			entries.append({"kind": "ashwalker", "t": t, "hp": hp_mult, "spd": speed_mult})
-			t += 0.7
-
-	if n >= 9 and n % 2 == 1:
-		t += 1.4
-		for i in 1 + n / 8:
-			entries.append({"kind": "mender", "t": t, "hp": hp_mult, "spd": speed_mult})
-			t += 1.6
-
-	if n >= 10 and n % 4 == 0:
-		t += 1.0
-		for i in 1 + n / 9:
-			entries.append({"kind": "thief", "t": t, "hp": hp_mult, "spd": speed_mult})
-			t += 0.5
-
-	if n >= 12:
-		t += 1.6
-		for i in 1 + n / 14:
-			entries.append({"kind": "warden", "t": t, "hp": hp_mult, "spd": speed_mult})
-			t += 2.0
-
-	if n >= 6:
-		t += 1.5
-		for i in 1 + int(float(n) / 5.0):
-			entries.append({"kind": "tank", "t": t, "hp": hp_mult, "spd": speed_mult})
-			t += 1.8
+	for rule: Dictionary in TDData.wave_rules(str(level_def.get("area", ""))):
+		if not TDData.wave_rule_active(rule, n):
+			continue
+		var count := TDData.wave_group_count(rule, n)
+		if count <= 0:
+			continue
+		t += float(rule.get("lead", 0.0))
+		var gap: float = maxf(float(rule.get("gap_min", 0.0)),
+				float(rule["gap"]) + float(rule.get("gap_ramp", 0.0)) * float(n))
+		for i in count:
+			entries.append({"kind": str(rule["kind"]), "t": t, "hp": hp_mult,
+					"spd": speed_mult})
+			t += gap
 
 	entries.sort_custom(func(a, b): return float(a["t"]) < float(b["t"]))
 	_assign_routes(entries, wave_lanes(n))

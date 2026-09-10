@@ -209,6 +209,7 @@ func _ready() -> void:
 	_check_tuning()
 	_check_knockback_fatigue()
 	_check_save_versioning()
+	_check_wave_rules()
 	_check_enemy_kinds()
 	_check_cheats()
 	_check_audio()
@@ -1495,6 +1496,99 @@ func _check_targeting() -> void:
 
 
 
+
+
+
+
+## Waves come from a table now. The base curve must be exactly what the old
+## hardcoded builder produced, and each area's flavour must actually change
+## something without making the area absurd.
+func _check_wave_rules() -> void:
+	# Golden compositions, captured from the hardcoded builder it replaced.
+	var golden: Dictionary = {
+		1: {"grunt": 5},
+		4: {"grunt": 8, "runner": 4},
+		6: {"grunt": 11, "runner": 5, "swarm": 9, "tank": 2, "bolt": 2},
+		10: {"grunt": 11, "runner": 6, "boss": 1},
+		12: {"grunt": 18, "runner": 8, "swarm": 12, "tank": 3, "warden": 1,
+			"bolt": 3, "thief": 2},
+		20: {"grunt": 16, "runner": 8, "titan": 1},
+		30: {"grunt": 21, "runner": 10, "boss": 1},
+	}
+	var saved_level: Dictionary = game.level_def
+	var greens: Array = TDData.levels_in_area("greenlands")
+	game.level_def = TDData.LEVELS[int(greens[0])]
+	var wrong := ""
+	for n: int in golden:
+		var got: Dictionary = game.wave_composition(n)
+		var want: Dictionary = golden[n]
+		if got.size() != want.size():
+			wrong = "wave %d has %d kinds, expected %d" % [n, got.size(), want.size()]
+		for kind: String in want:
+			if int(got.get(kind, -1)) != int(want[kind]):
+				wrong = "wave %d %s = %d, expected %d" % [n, kind,
+						int(got.get(kind, -1)), int(want[kind])]
+	check("the table reproduces the old wave curve exactly (%s)" % wrong, wrong == "")
+
+	# Rule gating.
+	var swarm: Dictionary = {}
+	for rule: Dictionary in TDData.WAVE_RULES:
+		if str(rule["kind"]) == "swarm":
+			swarm = rule
+	check("a rule waits for its first wave", not TDData.wave_rule_active(swarm, 4))
+	check("and then only lands on its own cadence",
+			TDData.wave_rule_active(swarm, 6) and not TDData.wave_rule_active(swarm, 7))
+	check("groups grow with the wave",
+			TDData.wave_group_count(swarm, 20) > TDData.wave_group_count(swarm, 6))
+
+	# Every area must actually feel different, and stay in a sane band.
+	var probes: Array = [8, 12, 15, 18, 25]
+	var base_comp: Dictionary = {}
+	var base_total: Dictionary = {}
+	for n: int in probes:
+		var comp: Dictionary = game.wave_composition(n)
+		base_comp[n] = comp
+		var total := 0
+		for kind: String in comp:
+			total += int(comp[kind])
+		base_total[n] = total
+	var same: Array = []
+	var extreme: Array = []
+	var bossless: Array = []
+	for area: Dictionary in TDData.AREAS:
+		var maps: Array = TDData.levels_in_area(str(area["id"]))
+		if maps.is_empty():
+			continue
+		game.level_def = TDData.LEVELS[int(maps[0])]
+		var differs := false
+		for n: int in probes:
+			var comp: Dictionary = game.wave_composition(n)
+			var total := 0
+			for kind: String in comp:
+				total += int(comp[kind])
+			if comp != base_comp[n]:
+				differs = true
+			if total < int(float(base_total[n]) * 0.6) \
+					or total > int(float(base_total[n]) * 1.7):
+				extreme.append("%s w%d:%d vs %d" % [area["id"], n, total, base_total[n]])
+		if str(area["id"]) != "greenlands" and not differs:
+			same.append(str(area["id"]))
+		var boss: Dictionary = game.wave_composition(20)
+		if not boss.has("boss") and not boss.has("titan"):
+			bossless.append(str(area["id"]))
+	check("every area past the first sends something different (%s)" % ",".join(same),
+			same.is_empty())
+	check("but none of them runs away with it (%s)" % ",".join(extreme),
+			extreme.is_empty())
+	check("boss waves survive every flavour (%s)" % ",".join(bossless),
+			bossless.is_empty())
+	# The "add" hook has to work, not just "tweak".
+	var wastes_kinds: Array = []
+	for rule: Dictionary in TDData.wave_rules("wastes"):
+		wastes_kinds.append(str(rule["kind"]))
+	check("an area can add a group of its own",
+			wastes_kinds.count("ashwalker") == 2)
+	game.level_def = saved_level
 
 
 ## Saves carry a version and are walked forward on load. Everything here
