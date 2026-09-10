@@ -121,13 +121,105 @@ static func migrate_legacy() -> void:
 	old.save(slot_path(0))
 
 
+## Bumped whenever the shape of a save changes. Every older version has a
+## migration step below, so an old file is upgraded on load instead of
+## crashing the first time new code reads a key that was never written.
+##
+##   1  pre-slots, at most one parked run under [run] state
+##   2  one parked run per map under [runs], run stats without the per-kind
+##      kill and leak tallies
+##   3  current: versioned, and every parked run carries the full stat set
+const SAVE_VERSION := 3
+
+## The keys a parked run's stats must have. Kept here rather than imported
+## from game.gd so migration does not depend on the match scene.
+const RUN_STAT_KEYS: Array = ["kills", "leaks", "towers_built", "gold_earned",
+		"damage", "tower_kills", "tower_built", "enemy_kills", "enemy_leaks"]
+
+## Set when the slot was written by a newer build than this one. Saving is
+## refused for that slot so a downgrade cannot quietly delete what it could
+## not read.
+static var slot_too_new: bool = false
+
+
+## What version a file claims, inferring one for saves written before the
+## field existed.
+static func detect_version(cfg: ConfigFile) -> int:
+	var stamped := int(cfg.get_value("meta", "version", 0))
+	if stamped > 0:
+		return stamped
+	return 1 if cfg.has_section("run") else 2
+
+
+## Walks a loaded config forward to SAVE_VERSION, one step at a time, so a
+## save that skipped several builds still arrives in the right shape.
+static func migrate_config(cfg: ConfigFile, from_version: int) -> int:
+	var at := from_version
+	while at < SAVE_VERSION:
+		match at:
+			1:
+				# One parked run became one per map.
+				var legacy: Dictionary = cfg.get_value("run", "state", {})
+				var level_id := str(legacy.get("level", ""))
+				if not legacy.is_empty() and level_id != "" \
+						and not cfg.has_section_key("runs", level_id):
+					cfg.set_value("runs", level_id, legacy)
+				if cfg.has_section("run"):
+					cfg.erase_section("run")
+			2:
+				# Run stats gained per-kind tallies; fill them in so the
+				# match does not index a key that was never saved.
+				if cfg.has_section("runs"):
+					for key: String in cfg.get_section_keys("runs"):
+						var run: Dictionary = cfg.get_value("runs", key, {})
+						if run.is_empty():
+							continue
+						var run_stats: Dictionary = run.get("stats", {})
+						for stat_key: String in RUN_STAT_KEYS:
+							if not run_stats.has(stat_key):
+								run_stats[stat_key] = {} if stat_key.ends_with("kills") \
+										or stat_key.ends_with("leaks") \
+										or stat_key.ends_with("built") else 0
+						# kills and leaks themselves are counters, not maps.
+						for counter: String in ["kills", "leaks"]:
+							if typeof(run_stats.get(counter)) == TYPE_DICTIONARY:
+								run_stats[counter] = 0
+						run["stats"] = run_stats
+						cfg.set_value("runs", key, run)
+		at += 1
+	cfg.set_value("meta", "version", SAVE_VERSION)
+	return at
+
+
 static func load_state() -> void:
 	if loaded:
 		return
 	loaded = true
+	slot_too_new = false
 	var cfg := ConfigFile.new()
 	if cfg.load(slot_path(slot)) != OK:
 		return
+	var found := detect_version(cfg)
+	if found > SAVE_VERSION:
+		# Read what we understand, but never write this slot back.
+		slot_too_new = true
+		push_warning("Save slot %d was written by a newer build (v%d > v%d); it will not be overwritten."
+				% [slot + 1, found, SAVE_VERSION])
+	elif found < SAVE_VERSION:
+		migrate_config(cfg, found)
+	apply_config(cfg)
+
+
+## Reads a migrated config into the live account. Split out from load_state
+## so it can be exercised without a file on disk.
+static func apply_config(cfg: ConfigFile) -> void:
+	# Every table is cleared first: switching slots must not leave the
+	# previous account's tech, records or lifetime stats behind.
+	ranks = {}
+	bests = {}
+	runs = {}
+	stats = {}
+	tower_ranks = {}
 	xp = int(cfg.get_value("progress", "xp", 0))
 	coins = int(cfg.get_value("progress", "coins", 0))
 	if cfg.has_section("tech"):
@@ -136,14 +228,9 @@ static func load_state() -> void:
 	if cfg.has_section("best_wave"):
 		for key: String in cfg.get_section_keys("best_wave"):
 			bests[key] = int(cfg.get_value("best_wave", key, 0))
-	runs = {}
 	if cfg.has_section("runs"):
 		for key: String in cfg.get_section_keys("runs"):
 			runs[key] = cfg.get_value("runs", key, {})
-	# A save from when only one run could be parked at a time.
-	var legacy: Dictionary = cfg.get_value("run", "state", {})
-	if not legacy.is_empty() and not runs.has(str(legacy.get("level", ""))):
-		runs[str(legacy.get("level", ""))] = legacy
 	options["sfx"] = float(cfg.get_value("options", "sfx", 0.8))
 	options["music"] = float(cfg.get_value("options", "music", 0.35))
 	if cfg.has_section("stats"):
@@ -155,9 +242,10 @@ static func load_state() -> void:
 
 
 static func save_state() -> void:
-	if read_only:
+	if read_only or slot_too_new:
 		return
 	var cfg := ConfigFile.new()
+	cfg.set_value("meta", "version", SAVE_VERSION)
 	cfg.set_value("progress", "xp", xp)
 	cfg.set_value("progress", "coins", coins)
 	for key: String in ranks:
@@ -381,6 +469,7 @@ static func use_clean_state() -> void:
 	loaded = true
 	read_only = true
 	unlock_all = true
+	slot_too_new = false
 	xp = 0
 	coins = 0
 	ranks = {}

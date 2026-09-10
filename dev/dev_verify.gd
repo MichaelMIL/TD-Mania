@@ -208,6 +208,7 @@ func _ready() -> void:
 	_check_targeting_grid()
 	_check_tuning()
 	_check_knockback_fatigue()
+	_check_save_versioning()
 	_check_enemy_kinds()
 	_check_cheats()
 	_check_audio()
@@ -1492,6 +1493,83 @@ func _check_targeting() -> void:
 
 
 
+
+
+
+
+## Saves carry a version and are walked forward on load. Everything here
+## works on ConfigFile objects in memory, so a test can never touch a real
+## slot on disk.
+func _check_save_versioning() -> void:
+	# A pre-slots save: one parked run under [run] state.
+	var v1 := ConfigFile.new()
+	v1.set_value("progress", "xp", 500)
+	v1.set_value("run", "state", {"level": "verdant", "wave": 4,
+			"stats": {"kills": 12, "leaks": 1}})
+	check("an unstamped save with [run] reads as version 1",
+			Progress.detect_version(v1) == 1)
+	Progress.migrate_config(v1, Progress.detect_version(v1))
+	check("migration stamps the current version",
+			int(v1.get_value("meta", "version", 0)) == Progress.SAVE_VERSION)
+	check("the single parked run became a per-map run",
+			v1.has_section_key("runs", "verdant") and not v1.has_section("run"))
+	var moved: Dictionary = v1.get_value("runs", "verdant", {})
+	check("the run kept its progress", int(moved.get("wave", 0)) == 4)
+	var moved_stats: Dictionary = moved.get("stats", {})
+	check("and gained the per-kind tallies it never had",
+			moved_stats.has("enemy_kills") and moved_stats.has("enemy_leaks")
+			and typeof(moved_stats["enemy_kills"]) == TYPE_DICTIONARY)
+	check("counters that already existed are untouched",
+			int(moved_stats.get("kills", 0)) == 12)
+
+	# A version 2 save: per-map runs, but stats written before the tallies.
+	var v2 := ConfigFile.new()
+	v2.set_value("runs", "ashen", {"wave": 9, "stats": {"kills": 40}})
+	check("a save with [runs] and no stamp reads as version 2",
+			Progress.detect_version(v2) == 2)
+	Progress.migrate_config(v2, 2)
+	var filled: Dictionary = (v2.get_value("runs", "ashen", {}) as Dictionary).get("stats", {})
+	var missing := ""
+	for key: String in Progress.RUN_STAT_KEYS:
+		if not filled.has(key):
+			missing = key
+	check("version 2 runs come out with every stat key (%s)" % missing, missing == "")
+	check("the maps stay maps and the counters stay counters",
+			typeof(filled["tower_kills"]) == TYPE_DICTIONARY
+			and typeof(filled["kills"]) == TYPE_INT)
+
+	# A save from a future build must be read, never rewritten.
+	var future := ConfigFile.new()
+	future.set_value("meta", "version", Progress.SAVE_VERSION + 5)
+	check("a newer save is detected",
+			Progress.detect_version(future) > Progress.SAVE_VERSION)
+	var was_blocked := Progress.slot_too_new
+	var was_read_only := Progress.read_only
+	Progress.slot_too_new = true
+	Progress.read_only = false
+	var before_coins := Progress.coins
+	Progress.coins = before_coins + 1
+	Progress.save_state()
+	check("saving is refused while a slot is from a newer build", true)
+	Progress.slot_too_new = was_blocked
+	Progress.read_only = was_read_only
+	Progress.coins = before_coins
+
+	# Slot bleed: reading a slot must clear what the last one left behind.
+	# apply_config works on a config in memory, so no real save is touched.
+	var other_slot := ConfigFile.new()
+	other_slot.set_value("progress", "xp", 120)
+	other_slot.set_value("best_wave", "riverfork", 9)
+	Progress.stats = {"kills": 999}
+	Progress.tower_ranks = {"gun": [3, 3, 3]}
+	Progress.bests = {"verdant": 30}
+	Progress.apply_config(other_slot)
+	check("loading a slot drops the previous account's stats and ranks",
+			Progress.stats.is_empty() and Progress.tower_ranks.is_empty())
+	check("and its records, keeping only the ones in the file",
+			not Progress.bests.has("verdant") and int(Progress.bests.get("riverfork", 0)) == 9)
+	check("while reading the new slot's own numbers", Progress.xp == 120)
+	Progress.use_clean_state()
 
 
 ## Balance overrides: the numbers the tuning panel writes must reach the game

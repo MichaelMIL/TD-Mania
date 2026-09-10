@@ -43,6 +43,20 @@ version. The names are the keys in `Audio.bank`: `shot_gun`, `shot_cannon`,
 `shot_light`, `explosion`, `death`, `leak`, `build`, `upgrade`, `sell`,
 `wave_start`, `wave_clear`, `game_over`, `boss`, `click`, `beam`, `music`.
 
+### Save format
+
+Each slot is a `ConfigFile` at `user://td_mania_slot_N.cfg` stamped with
+`[meta] version` (`Progress.SAVE_VERSION`). On load the version is detected —
+saves written before the field existed are inferred from their shape — and
+`migrate_config()` walks the file forward one step at a time, so a save that
+skipped several builds still arrives in the right shape. A slot written by a
+*newer* build is read as best it can be but never written back, so a
+downgrade cannot quietly delete what it could not understand.
+
+Adding a field means bumping `SAVE_VERSION` and adding one `match` arm to
+`migrate_config()`; `_check_save_versioning()` migrates fabricated v1 and v2
+configs in memory and asserts the result.
+
 ## Progression
 
 Every run pays out **XP** and **coins**, scaled by waves survived, score and

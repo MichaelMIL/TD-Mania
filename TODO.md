@@ -67,10 +67,15 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
 
 ## Robustness
 
-- [ ] **Save versioning.** `scripts/progress.gd` has no `version` field. The
-      `enemy_kills` crash was exactly this class of bug — an old save meeting
-      new code. Add a version number and explicit migration steps so the next
-      schema change is safe by construction.
+- [x] **Save versioning.** *Implemented 2026-09-10.* Saves carry
+      `[meta] version` (`Progress.SAVE_VERSION`, now 3). `detect_version()`
+      infers a version for files written before the field existed,
+      `migrate_config()` walks a save forward one step at a time (v1's single
+      parked run becomes per-map runs; v2's run stats gain the per-kind
+      tallies whose absence caused the `enemy_kills` crash), and a slot from
+      a *newer* build is read but never overwritten. Reading a slot now also
+      clears the previous slot's tech, records, stats and ranks, which used
+      to bleed between accounts.
 - [ ] **Full-speed smoke test.** Every harness runs at accelerated
       `time_scale`; nothing plays a wave at 1× and asserts no runtime errors.
       That gap is how the freed-object crashes slipped past 292 assertions.
