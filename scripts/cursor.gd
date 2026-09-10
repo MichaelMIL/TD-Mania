@@ -42,6 +42,14 @@ func _draw() -> void:
 		draw_circle(pos, dead, Color(0.9, 0.3, 0.3, 0.1))
 		draw_arc(pos, dead, 0.0, TAU, 40, Color(0.95, 0.4, 0.4, 0.5), 1.5, true)
 	draw_circle(pos, 20.0, Color(tint.r, tint.g, tint.b, 0.35))
+	# Green and red are the same colour to a good few people, so the cell
+	# says yes or no in a shape as well.
+	if ok:
+		draw_line(pos + Vector2(-9.0, 0.0), pos + Vector2(-3.0, 7.0), col, 3.0, true)
+		draw_line(pos + Vector2(-3.0, 7.0), pos + Vector2(9.0, -8.0), col, 3.0, true)
+	else:
+		draw_line(pos + Vector2(-8.0, -8.0), pos + Vector2(8.0, 8.0), col, 3.0, true)
+		draw_line(pos + Vector2(8.0, -8.0), pos + Vector2(-8.0, 8.0), col, 3.0, true)
 
 	# Highlight every cell of the same terrain type when nothing fits here, so
 	# it is obvious where a water-only tower can go.

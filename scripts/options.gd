@@ -10,6 +10,7 @@ var music_slider: HSlider
 var sfx_value: Label
 var music_value: Label
 var scale_row: HBoxContainer
+var colourblind_button: Button
 var key_rows: Dictionary = {}
 var status: Label
 ## The action waiting for a key press, or "" when nothing is being rebound.
@@ -146,6 +147,20 @@ func _build() -> void:
 			int(ProjectSettings.get_setting("display/window/size/viewport_height"))],
 			11, Color(1, 1, 1, 0.45)))
 
+	var access_card := PanelContainer.new()
+	access_card.add_theme_stylebox_override("panel", _sb(Color("121a26"), Color("2c3a52")))
+	left.add_child(access_card)
+	var access_col := VBoxContainer.new()
+	access_col.add_theme_constant_override("separation", 6)
+	access_card.add_child(access_col)
+	access_col.add_child(_label("SEEING IT", 15, Color("90a4ae")))
+	colourblind_button = _button("", 300.0)
+	colourblind_button.tooltip_text = "Swaps lane colours for a palette that survives the common forms of colour blindness. Lane shapes and tier marks are always on."
+	colourblind_button.pressed.connect(_toggle_colourblind)
+	access_col.add_child(colourblind_button)
+	access_col.add_child(_label("Lanes are also told apart by shape, and difficulty by a mark, whether this is on or off.",
+			11, Color(1, 1, 1, 0.45)))
+
 	status = _label("", 13, Color("ffd54f"))
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	left.add_child(status)
@@ -242,6 +257,12 @@ func _on_fullscreen() -> void:
 	_say("Windowed." if full else "Fullscreen.")
 
 
+func _toggle_colourblind() -> void:
+	Progress.set_colourblind(not Progress.colourblind())
+	_refresh()
+	_say("Colour-blind palette %s." % ("on" if Progress.colourblind() else "off"))
+
+
 func _listen_for(action: String) -> void:
 	listening = action
 	_refresh()
@@ -301,6 +322,11 @@ func _refresh() -> void:
 				child.modulate = Color("9ce89c") \
 						if int(child.get_meta("cap")) == Progress.frame_cap() \
 						else Color.WHITE
+	if colourblind_button != null:
+		colourblind_button.text = "Colour-blind palette: %s" \
+				% ("on" if Progress.colourblind() else "off")
+		colourblind_button.modulate = Color("9ce89c") if Progress.colourblind() \
+				else Color.WHITE
 	for action: String in key_rows:
 		var b: Button = key_rows[action]
 		b.text = "press a key…" if listening == action else Progress.key_name(action)

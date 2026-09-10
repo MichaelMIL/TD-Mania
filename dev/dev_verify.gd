@@ -214,6 +214,7 @@ func _ready() -> void:
 	_check_boss_abilities()
 	_check_hazards()
 	_check_area_music()
+	_check_colour_access()
 	_check_modifiers()
 	_check_flyers()
 	_check_board_tooltips()
@@ -2379,6 +2380,82 @@ func _check_modifiers() -> void:
 
 
 
+
+
+
+## Colour is not the only channel: lanes have shapes, tiers have marks, the
+## build cursor has a tick or a cross, and the palette can be swapped.
+func _check_colour_access() -> void:
+	var was: bool = Progress.colourblind()
+	Progress.set_colourblind(false)
+	var plain: Array = []
+	for i in 4:
+		plain.append(TDData.route_color(i))
+	Progress.set_colourblind(true)
+	var safe: Array = []
+	for i in 4:
+		safe.append(TDData.route_color(i))
+	check("the option changes the lane palette", plain != safe)
+	check("and the safe palette has a colour per lane",
+			TDData.SAFE_ROUTE_COLORS.size() >= TDData.ROUTE_COLORS.size())
+	# The real test: simulate the two common forms of colour blindness and
+	# check the lanes stay apart under both, and in brightness for anyone
+	# looking at a grey screenshot.
+	var too_close := ""
+	for i in safe.size():
+		for j in range(i + 1, safe.size()):
+			var a: Color = safe[i]
+			var b: Color = safe[j]
+			for kind: String in ["protanopia", "deuteranopia"]:
+				if _colour_gap(_simulate(a, kind), _simulate(b, kind)) < 0.25:
+					too_close = "%d/%d under %s" % [i, j, kind]
+			if absf(a.get_luminance() - b.get_luminance()) < 0.03:
+				too_close = "%d/%d in brightness" % [i, j]
+	check("safe lane colours stay apart under colour blindness (%s)" % too_close,
+			too_close == "")
+	Progress.set_colourblind(was)
+
+	var shapes: Array = []
+	for i in 4:
+		shapes.append(TDData.route_shape(i))
+	var unique: Array = []
+	for shape: String in shapes:
+		if not unique.has(shape):
+			unique.append(shape)
+	check("every lane has its own shape", unique.size() == shapes.size())
+	var marks: Array = []
+	for tier in TDData.TIERS.size():
+		marks.append(TDData.tier_mark(tier))
+	var unique_marks: Array = []
+	for mark: String in marks:
+		if not unique_marks.has(mark):
+			unique_marks.append(mark)
+	check("and every tier its own mark", unique_marks.size() == marks.size())
+
+	# The setting survives a save round trip.
+	var cfg := ConfigFile.new()
+	cfg.set_value("meta", "version", Progress.SAVE_VERSION)
+	cfg.set_value("options", "colourblind", true)
+	Progress.apply_config(cfg)
+	check("the choice is remembered", Progress.colourblind())
+	Progress.use_clean_state()
+
+
+
+
+## The usual linear approximations of the two common forms of red-green
+## colour blindness. Good enough to tell "these two lanes are the same
+## colour to a lot of people" from "these two are fine".
+func _simulate(c: Color, kind: String) -> Color:
+	if kind == "protanopia":
+		return Color(0.567 * c.r + 0.433 * c.g, 0.558 * c.r + 0.442 * c.g,
+				0.242 * c.g + 0.758 * c.b)
+	return Color(0.625 * c.r + 0.375 * c.g, 0.7 * c.r + 0.3 * c.g,
+			0.3 * c.g + 0.7 * c.b)
+
+
+func _colour_gap(a: Color, b: Color) -> float:
+	return Vector3(a.r - b.r, a.g - b.g, a.b - b.b).length()
 
 ## Music is per area: the same loop, tuned differently.
 func _check_area_music() -> void:

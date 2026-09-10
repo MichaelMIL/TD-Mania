@@ -492,8 +492,9 @@ func _difficulty_pill(level: Dictionary) -> Control:
 	box.content_margin_top = 2
 	box.content_margin_bottom = 2
 	pill.add_theme_stylebox_override("panel", box)
-	var text := _label("%s %d/%d" % [str(tier["name"]).to_upper(),
-			int(level["tier"]) + 1, TDData.TIERS.size()], 12, accent)
+	var text := _label("%s %s %d/%d" % [TDData.tier_mark(int(level["tier"])),
+			str(tier["name"]).to_upper(), int(level["tier"]) + 1,
+			TDData.TIERS.size()], 12, accent)
 	pill.add_child(text)
 	return pill
 

@@ -335,6 +335,28 @@ func _draw_tint() -> void:
 ## Theme props on dry ground: trees, grass tufts, cracks, snow and so on.
 ## Each level names its own motif, which is most of what makes the maps look
 ## like different places.
+## A lane marker: circle, square, triangle or diamond, filled faintly and
+## outlined in the lane's colour.
+func _draw_lane_mark(shape: String, at: Vector2, radius: float, tint: Color) -> void:
+	var fill := Color(tint.r, tint.g, tint.b, 0.32)
+	match shape:
+		"square":
+			var box := Rect2(at - Vector2(radius, radius), Vector2(radius, radius) * 2.0)
+			draw_rect(box, fill)
+			draw_rect(box, tint, false, 3.0)
+		"triangle", "diamond":
+			var points := PackedVector2Array()
+			var sides := 3 if shape == "triangle" else 4
+			for i in sides:
+				points.append(at + Vector2.UP.rotated(TAU * float(i) / float(sides))
+						* radius * 1.25)
+			draw_colored_polygon(points, fill)
+			draw_polyline(points + PackedVector2Array([points[0]]), tint, 3.0, true)
+		_:
+			draw_circle(at, radius, fill)
+			draw_arc(at, radius, 0.0, TAU, 24, tint, 3.0, true)
+
+
 func _draw_decor(cell: float) -> void:
 	var kind := str(game.level_def.get("decor", ""))
 	if kind == "":
@@ -616,8 +638,8 @@ func _draw() -> void:
 		var goal: Vector2 = route[route.size() - 1]
 		var s_in := start + (route[1] - start).normalized() * cell * 1.25
 		var g_in := goal + (route[route.size() - 2] - goal).normalized() * cell * 1.25
-		draw_circle(s_in, cell * 0.3, Color(tint.r, tint.g, tint.b, 0.32))
-		draw_arc(s_in, cell * 0.3, 0.0, TAU, 24, tint, 3.0, true)
+		# The lane's own shape, so two spawns are told apart without colour.
+		_draw_lane_mark(TDData.route_shape(index), s_in, cell * 0.3, tint)
 		var tag := " %d" % (index + 1) if many else ""
 		draw_string(font, s_in + Vector2(-34.0, 34.0), "SPAWN" + tag,
 				HORIZONTAL_ALIGNMENT_CENTER, 68, 12, Color(tint.r, tint.g, tint.b, 0.8))

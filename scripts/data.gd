@@ -422,8 +422,34 @@ static var ROUTE_COLORS: Array = [Color("9575cd"), Color("4fc3f7"), Color("ffb74
 		Color("81c784")]
 
 
+## Okabe-Ito: chosen because these stay apart under every common form of
+## colour blindness. Used in place of the default lane colours when the
+## option is on.
+## Four Okabe-Ito colours, picked by simulating protanopia and deuteranopia
+## over the whole palette and keeping the set whose closest pair stays
+## furthest apart — including in brightness, so they survive being
+## screenshotted in grey as well.
+static var SAFE_ROUTE_COLORS: Array = [Color("0072b2"), Color("56b4e9"),
+	Color("f0e442"), Color("cc79a7")]
+
+## A shape per lane, drawn alongside the colour, so two lanes are told
+## apart by more than hue. Always on — it costs nothing and helps everyone.
+static var ROUTE_SHAPES: Array = ["circle", "square", "triangle", "diamond"]
+
+
 static func route_color(index: int) -> Color:
+	if Progress.colourblind():
+		return SAFE_ROUTE_COLORS[index % SAFE_ROUTE_COLORS.size()]
 	return ROUTE_COLORS[index % ROUTE_COLORS.size()]
+
+
+static func route_shape(index: int) -> String:
+	return ROUTE_SHAPES[index % ROUTE_SHAPES.size()]
+
+
+## A mark per tier, so difficulty is not only a colour.
+static func tier_mark(tier: int) -> String:
+	return ["●", "◆", "▲", "★"][clampi(tier, 0, 3)]
 
 
 static func tier_of(level: Dictionary) -> Dictionary:

@@ -77,6 +77,25 @@ Adding a field means bumping `SAVE_VERSION` and adding one `match` arm to
 `migrate_config()`; `_check_save_versioning()` migrates fabricated v1 and v2
 configs in memory and asserts the result.
 
+### Seeing it
+
+Hue was doing too much work: lanes, tiers, tower types and creep kinds were
+all told apart by colour alone, and roughly one man in twelve cannot
+separate some of those pairs.
+
+Two things are now always on, because they cost nothing and help everyone:
+each lane draws its own **shape** at the spawn portal (circle, square,
+triangle, diamond) alongside its colour, and each difficulty carries a
+**mark** (● ◆ ▲ ★) next to its name. The build cursor draws a tick or a
+cross rather than relying on green versus red.
+
+**Options → Colour-blind palette** additionally swaps the lane colours for
+four Okabe-Ito colours chosen by simulating protanopia and deuteranopia
+across the whole palette and keeping the set whose closest pair stays
+furthest apart — brightness included, so they survive a grey screenshot.
+The suite runs that same simulation as a test, so the palette cannot
+quietly regress.
+
 ### Music per area
 
 The ambient pad is synthesised, so an area-flavoured version costs a

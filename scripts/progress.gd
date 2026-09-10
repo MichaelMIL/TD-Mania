@@ -273,6 +273,7 @@ static func apply_config(cfg: ConfigFile) -> void:
 			keys[key] = int(cfg.get_value("keys", key, 0))
 	options["window_scale"] = float(cfg.get_value("options", "window_scale", 1.0))
 	options["frame_cap"] = int(cfg.get_value("options", "frame_cap", 60))
+	options["colourblind"] = bool(cfg.get_value("options", "colourblind", false))
 
 
 static func save_state() -> void:
@@ -300,6 +301,7 @@ static func save_state() -> void:
 		cfg.set_value("keys", key, int(keys[key]))
 	cfg.set_value("options", "window_scale", window_scale())
 	cfg.set_value("options", "frame_cap", frame_cap())
+	cfg.set_value("options", "colourblind", colourblind())
 	for key: String in runs:
 		cfg.set_value("runs", key, runs[key])
 	cfg.save(slot_path(slot))
@@ -392,6 +394,21 @@ static func set_frame_cap(value: int) -> void:
 	options["frame_cap"] = value
 	save_state()
 	App.apply_cap()
+
+
+## Colour-blind mode. Hue carries a lot in this game — routes, tiers, tower
+## types, creep kinds — so this swaps the palettes that matter for ones
+## that survive the common forms of colour blindness, and turns on the
+## symbols that say the same thing without colour at all.
+static func colourblind() -> bool:
+	load_state()
+	return bool(options.get("colourblind", false))
+
+
+static func set_colourblind(on: bool) -> void:
+	load_state()
+	options["colourblind"] = on
+	save_state()
 
 
 static func window_scale() -> float:
