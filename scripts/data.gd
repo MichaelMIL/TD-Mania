@@ -225,6 +225,51 @@ static func wave_rule_active(rule: Dictionary, n: int) -> bool:
 	return every <= 1 or n % every == int(rule.get("offset", 0))
 
 
+## ------------------------------------------------------------- objectives
+##
+## Three per map, worth a star each. Two come from the tier — get deep, and
+## get deep without being touched — and the third is the map's own `goal`.
+## They are what turns "go as deep as you can" into a reason to come back.
+static var TIER_GOAL_WAVE: Array = [15, 14, 12, 10]
+static var TIER_CLEAN_WAVE: Array = [8, 8, 7, 6]
+
+
+static func objectives_for(level: Dictionary) -> Array:
+	var tier := int(level.get("tier", 0))
+	var deep := int(TIER_GOAL_WAVE[clampi(tier, 0, TIER_GOAL_WAVE.size() - 1)])
+	var clean := int(TIER_CLEAN_WAVE[clampi(tier, 0, TIER_CLEAN_WAVE.size() - 1)])
+	var out: Array = [
+		{"kind": "waves", "n": deep, "text": "Clear wave %d" % deep},
+		{"kind": "clean", "n": clean,
+			"text": "Reach wave %d without losing a life" % clean},
+	]
+	var goal: Dictionary = level.get("goal", {})
+	if not goal.is_empty():
+		out.append(_goal_text(goal))
+	return out
+
+
+## Turns a map's goal entry into a labelled objective.
+static func _goal_text(goal: Dictionary) -> Dictionary:
+	var out: Dictionary = goal.duplicate(true)
+	var n := int(goal.get("n", 10))
+	match str(goal.get("kind", "")):
+		"no_water":
+			out["text"] = "Clear wave %d with no water towers" % n
+		"few_towers":
+			out["text"] = "Clear wave %d with %d towers or fewer" \
+					% [n, int(goal.get("towers", 10))]
+		"kills":
+			out["text"] = "Destroy %d enemies in one run" % n
+		"no_sell":
+			out["text"] = "Clear wave %d without selling a tower" % n
+		"rich":
+			out["text"] = "Hold $%d at once" % n
+		_:
+			out["text"] = "Clear wave %d" % n
+	return out
+
+
 static func area_of(level: Dictionary) -> Dictionary:
 	for a: Dictionary in AREAS:
 		if str(a["id"]) == str(level.get("area", "")):
@@ -274,6 +319,7 @@ static func level() -> Dictionary:
 static var LEVELS: Array = [
 	{
 		"id": "verdant",
+		"goal": {"kind": "no_water", "n": 10},
 		"unlock_level": 1,
 		"area": "greenlands",
 		"name": "Verdant Pass",
@@ -303,6 +349,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "meadow",
+		"goal": {"kind": "few_towers", "n": 8, "towers": 10},
 		"unlock_level": 2,
 		"area": "greenlands",
 		"name": "Meadow Loop",
@@ -330,6 +377,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "highlands",
+		"goal": {"kind": "kills", "n": 250},
 		"unlock_level": 3,
 		"area": "greenlands",
 		"name": "Windward Highlands",
@@ -358,6 +406,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "riverfork",
+		"goal": {"kind": "no_sell", "n": 12},
 		"unlock_level": 4,
 		"area": "riverlands",
 		"name": "Riverfork",
@@ -385,6 +434,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "crossroads",
+		"goal": {"kind": "rich", "n": 900},
 		"unlock_level": 5,
 		"area": "riverlands",
 		"name": "Crossroads",
@@ -413,6 +463,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "desert",
+		"goal": {"kind": "kills", "n": 400},
 		"unlock_level": 7,
 		"area": "wastes",
 		"name": "Desert Wash",
@@ -441,6 +492,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "ashen",
+		"goal": {"kind": "few_towers", "n": 10, "towers": 14},
 		"unlock_level": 9,
 		"area": "wastes",
 		"name": "Ashen Wastes",
@@ -469,6 +521,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "frostbite",
+		"goal": {"kind": "no_water", "n": 8},
 		"unlock_level": 8,
 		"area": "frozen",
 		"name": "Frostbite Bay",
@@ -496,6 +549,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "ruins",
+		"goal": {"kind": "no_water", "n": 10},
 		"unlock_level": 12,
 		"area": "wastes",
 		"name": "Old Ruins",
@@ -523,6 +577,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "delta",
+		"goal": {"kind": "few_towers", "n": 8, "towers": 10},
 		"unlock_level": 14,
 		"area": "delta",
 		"name": "Serpent Delta",
@@ -550,6 +605,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "comb",
+		"goal": {"kind": "kills", "n": 250},
 		"unlock_level": 16,
 		"area": "delta",
 		"name": "Iron Comb",
@@ -577,6 +633,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "coast",
+		"goal": {"kind": "no_sell", "n": 12},
 		"unlock_level": 11,
 		"area": "frozen",
 		"name": "Coastal Cliffs",
@@ -603,6 +660,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "twingates",
+		"goal": {"kind": "rich", "n": 900},
 		"unlock_level": 6,
 		"area": "riverlands",
 		"name": "Twin Gates",
@@ -634,6 +692,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "junction",
+		"goal": {"kind": "kills", "n": 400},
 		"unlock_level": 13,
 		"area": "frozen",
 		"name": "Fork Junction",
@@ -665,6 +724,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "convergence",
+		"goal": {"kind": "few_towers", "n": 10, "towers": 14},
 		"unlock_level": 18,
 		"area": "delta",
 		"name": "Convergence",
@@ -691,6 +751,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "fernhollow",
+		"goal": {"kind": "kills", "n": 300},
 		"area": "greenlands",
 		"unlock_level": 5,
 		"name": "Fernhollow",
@@ -720,6 +781,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "saltmarsh",
+		"goal": {"kind": "no_sell", "n": 10},
 		"area": "riverlands",
 		"unlock_level": 9,
 		"name": "Saltmarsh",
@@ -748,6 +810,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "obelisk",
+		"goal": {"kind": "rich", "n": 1200},
 		"area": "wastes",
 		"unlock_level": 15,
 		"name": "Obelisk Field",
@@ -776,6 +839,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "glacier",
+		"goal": {"kind": "few_towers", "n": 8, "towers": 12},
 		"area": "frozen",
 		"unlock_level": 17,
 		"name": "Glacier Run",
@@ -803,6 +867,7 @@ static var LEVELS: Array = [
 	},
 	{
 		"id": "pipeworks",
+		"goal": {"kind": "kills", "n": 500},
 		"area": "delta",
 		"unlock_level": 20,
 		"name": "Pipeworks",

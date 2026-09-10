@@ -60,7 +60,10 @@ func _build() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(title)
 
-	var sub := _label("Twelve towers. Fifteen battlegrounds across five areas. Endless waves.", 16,
+	# Counted from the tables, so it cannot go stale again.
+	var sub := _label("%d towers. %d battlegrounds across %d areas. %d kinds of enemy. Endless waves."
+			% [TDData.TOWERS.size(), TDData.LEVELS.size(), TDData.AREAS.size(),
+			TDData.ENEMIES.size()], 16,
 			Color(1, 1, 1, 0.6))
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(sub)
@@ -156,6 +159,8 @@ func _account_bar() -> Control:
 	row.add_child(_label(unlock_text, 13, Color("90a4ae")))
 
 	row.add_child(_label("%d coins" % Progress.coins, 18, Color("ffd54f")))
+	row.add_child(_label("★ %d/%d" % [Progress.total_stars(), TDData.LEVELS.size() * 3],
+			18, Color("ffd54f")))
 
 	var slots := Button.new()
 	slots.text = "Slot %d" % (Progress.slot + 1)
@@ -260,6 +265,16 @@ func _easier_first(a: int, b: int) -> bool:
 	return int(TDData.LEVELS[a]["tier"]) < int(TDData.LEVELS[b]["tier"])
 
 
+## The map's objectives, each marked with whether the account holds it.
+func _objective_texts(level: Dictionary, earned: int) -> Array:
+	var out: Array = []
+	var goals: Array = TDData.objectives_for(level)
+	for i in goals.size():
+		out.append("%s  %s" % ["★" if earned & (1 << i) != 0 else "☆",
+				str(goals[i]["text"])])
+	return out
+
+
 func _level_card(index: int) -> Control:
 	var d: Dictionary = TDData.LEVELS[index]
 	var tier: Dictionary = TDData.tier_of(d)
@@ -285,6 +300,14 @@ func _level_card(index: int) -> Control:
 	head.add_child(titles)
 	titles.add_child(_label(str(d["name"]), 21, Color("e3f2fd")))
 	titles.add_child(_label(str(d.get("theme", "")).to_upper(), 11, Color(1, 1, 1, 0.4)))
+	# Stars earned on this map, filled for the ones held.
+	var earned := Progress.stars_for(str(d["id"]))
+	var marks := ""
+	for i in TDData.objectives_for(d).size():
+		marks += "★" if earned & (1 << i) != 0 else "☆"
+	var star_label := _label(marks, 17, Color("ffd54f"))
+	star_label.tooltip_text = "\n".join(_objective_texts(d, earned))
+	head.add_child(star_label)
 	head.add_child(_difficulty_pill(d))
 
 	var body := HBoxContainer.new()
@@ -325,6 +348,11 @@ func _level_card(index: int) -> Control:
 		status = "Run in progress — wave %d   ·   %s" % [int(parked.get("wave", 0)) + 1,
 				status]
 	text.add_child(_label(status, 13, Color("ffd54f") if unlocked else Color("90a4ae")))
+	if unlocked:
+		var goals := _label("  ·  ".join(_objective_texts(d, Progress.stars_for(str(d["id"])))),
+				11, Color(1, 1, 1, 0.5))
+		goals.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		text.add_child(goals)
 
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 6)

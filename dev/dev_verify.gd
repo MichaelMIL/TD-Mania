@@ -212,6 +212,7 @@ func _ready() -> void:
 	_check_wave_rules()
 	_check_flyers()
 	_check_board_tooltips()
+	_check_objectives()
 	_check_enemy_kinds()
 	_check_cheats()
 	_check_audio()
@@ -1504,6 +1505,100 @@ func _check_targeting() -> void:
 
 
 
+
+
+
+
+## Every map has three objectives, they are judged on what the run actually
+## did, and the account keeps the union of every attempt.
+func _check_objectives() -> void:
+	var thin := ""
+	var vague := ""
+	for level: Dictionary in TDData.LEVELS:
+		var goals: Array = TDData.objectives_for(level)
+		if goals.size() != 3:
+			thin = "%s has %d" % [level["id"], goals.size()]
+		for goal: Dictionary in goals:
+			if str(goal.get("text", "")).strip_edges() == "":
+				vague = str(level["id"])
+	check("every map carries three objectives (%s)" % thin, thin == "")
+	check("and each one says what it wants (%s)" % vague, vague == "")
+
+	# Harder maps must not ask for more depth than easier ones.
+	var ladder := true
+	var deepest: Array = [0, 0, 0, 0]
+	for level: Dictionary in TDData.LEVELS:
+		var tier := int(level.get("tier", 0))
+		deepest[tier] = maxi(deepest[tier], int(TDData.objectives_for(level)[0]["n"]))
+	for i in range(1, 4):
+		if deepest[i] > deepest[i - 1]:
+			ladder = false
+	check("the wave objective eases off as the maps get harder (%s)"
+			% str(deepest), ladder)
+
+	# The evaluator, driven off a fabricated run.
+	var saved_stats: Dictionary = game.run_stats.duplicate(true)
+	var saved_level: Dictionary = game.level_def
+	game.level_def = TDData.LEVELS[0]
+	var goals: Array = TDData.objectives_for(game.level_def)
+	game.run_stats = game._blank_run_stats()
+	check("a fresh run has earned nothing", game.objective_mask() == 0)
+
+	game.run_stats["cleared"] = int(goals[0]["n"])
+	check("clearing the target wave earns the first star",
+			game.objective_mask() & 1 != 0)
+	check("and an untouched run earns the second too",
+			game.objective_mask() & 2 != 0)
+	game.run_stats["untouched"] = false
+	check("but leaking once loses it", game.objective_mask() & 2 == 0)
+
+	# The map's own goal: Verdant Pass asks for no water towers.
+	var own: Dictionary = goals[2]
+	check("the third objective is the map's own", str(own["kind"]) == "no_water")
+	game.run_stats["cleared"] = int(own["n"])
+	check("with no water tower built it is met", game.objective_mask() & 4 != 0)
+	game.run_stats["water_built"] = 1
+	check("building one loses it", game.objective_mask() & 4 == 0)
+
+	# Every goal kind has to be reachable, or a map is quietly impossible.
+	var unreachable: Array = []
+	for level: Dictionary in TDData.LEVELS:
+		game.level_def = level
+		var goal: Dictionary = TDData.objectives_for(level)[2]
+		game.run_stats = game._blank_run_stats()
+		game.run_stats["cleared"] = int(goal.get("n", 0)) + 40
+		game.run_stats["kills"] = int(goal.get("n", 0)) + 5000
+		game.run_stats["peak_gold"] = int(goal.get("n", 0)) + 5000
+		if game.objective_mask() & 4 == 0:
+			unreachable.append("%s/%s" % [level["id"], goal["kind"]])
+	check("every map's own objective can actually be met (%s)"
+			% ",".join(unreachable), unreachable.is_empty())
+
+	# Stars accumulate across attempts rather than replacing each other.
+	Progress.stars = {}
+	Progress.record_stars("verdant", 1)
+	Progress.record_stars("verdant", 4)
+	check("a second run adds its star to the first",
+			Progress.stars_for("verdant") == 5 and Progress.star_count("verdant") == 2)
+	check("re-earning one is not counted twice",
+			Progress.record_stars("verdant", 4) == 0)
+	check("the account totals them", Progress.total_stars() == 2)
+
+	# And they survive a save round trip.
+	var cfg := ConfigFile.new()
+	cfg.set_value("meta", "version", Progress.SAVE_VERSION)
+	cfg.set_value("stars", "verdant", 5)
+	Progress.apply_config(cfg)
+	check("stars are read back from a save", Progress.stars_for("verdant") == 5)
+	var old_save := ConfigFile.new()
+	old_save.set_value("runs", "verdant", {"wave": 3})
+	Progress.migrate_config(old_save, Progress.detect_version(old_save))
+	check("a save from before stars existed still migrates",
+			int(old_save.get_value("meta", "version", 0)) == Progress.SAVE_VERSION)
+
+	Progress.use_clean_state()
+	game.level_def = saved_level
+	game.run_stats = saved_stats
 
 
 ## Hovering a creep has to teach the roster: what it is, what it shrugs off,

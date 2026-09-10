@@ -344,6 +344,20 @@ then an outer ring as the total investment rises.
 | Helipad | Autocannon (4), Ammo Belts (3), Uprated Rotors (3), Wing Escort (1) | — |
 | Command Post | Doctrine (3), Logistics (3), Comms Array (3) | — |
 
+### Objectives and stars
+
+Every map carries three objectives, worth a star each: clear a target wave
+(15 on Easy down to 10 on Brutal), reach a wave without losing a single life,
+and the map's own goal — no water towers, a tower budget, a kill count, no
+selling, or holding a sum of gold at once. They are listed on the level card,
+on the in-match info panel with a tick against the ones the account holds,
+and on the defeat card.
+
+Stars are judged from what the run actually did (`Game.objective_mask()`) and
+banked per map as a bitmask, so a second attempt adds its star to the first
+rather than replacing it. A run that used a cheat earns none. `Progress`
+tracks the total for the account bar.
+
 ### Reading the board
 
 Hovering any creep shows a card beside the cursor: what it is, how much

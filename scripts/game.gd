@@ -117,7 +117,9 @@ var lbl_over: Label
 ## counter existed, so older saves keep working.
 static func _blank_run_stats() -> Dictionary:
 	return {"kills": 0, "leaks": 0, "towers_built": 0, "gold_earned": 0, "damage": 0,
-		"tower_kills": {}, "tower_built": {}, "enemy_kills": {}, "enemy_leaks": {}}
+		"tower_kills": {}, "tower_built": {}, "enemy_kills": {}, "enemy_leaks": {},
+		# Objective book-keeping: what the run did, not just how it went.
+		"sold": 0, "water_built": 0, "peak_gold": 0, "cleared": 0, "untouched": true}
 
 
 func _ready() -> void:
@@ -427,6 +429,8 @@ func _place_tower(type_id: String, c: Vector2i) -> Tower:
 	layer_towers.add_child(t)
 	occupied[c] = t
 	run_stats["towers_built"] = int(run_stats.get("towers_built", 0)) + 1
+	if int(TDData.tower_def(type_id)["terrain"]) == TDData.Terrain.WATER:
+		run_stats["water_built"] = int(run_stats.get("water_built", 0)) + 1
 	var built: Dictionary = run_stats.get("tower_built", {})
 	built[type_id] = int(built.get(type_id, 0)) + 1
 	run_stats["tower_built"] = built
@@ -524,6 +528,7 @@ func _sell_selected() -> void:
 	fx_text(selected.position, "+$%d" % value, Color("ffd54f"))
 	fx_ring(selected.position, 40.0, Color("90a4ae"))
 	Audio.play("sell", -8.0)
+	run_stats["sold"] = int(run_stats.get("sold", 0)) + 1
 	occupied.erase(selected.cell)
 	selected.queue_free()
 	_select(null)
@@ -553,6 +558,8 @@ func _process(delta: float) -> void:
 		elif break_timer <= 0.0:
 			_start_wave()
 	_update_hud()
+	# Gold peaks mid-wave, so the "hold $N" objective is watched live.
+	run_stats["peak_gold"] = maxi(int(run_stats.get("peak_gold", 0)), gold)
 	# Creeps walk out from under a still cursor, so the card is re-checked
 	# every frame rather than only on mouse movement.
 	_refresh_creep_tip()
@@ -594,8 +601,54 @@ func _start_wave_early() -> void:
 	_start_wave()
 
 
+## Which objectives this run has satisfied, as a bitmask over
+## `TDData.objectives_for(level_def)`.
+func objective_mask() -> int:
+	var mask := 0
+	var cleared := int(run_stats.get("cleared", 0))
+	var objectives: Array = TDData.objectives_for(level_def)
+	for i in objectives.size():
+		var goal: Dictionary = objectives[i]
+		var n := int(goal.get("n", 0))
+		var met := false
+		match str(goal["kind"]):
+			"waves":
+				met = cleared >= n
+			"clean":
+				met = cleared >= n and bool(run_stats.get("untouched", true))
+			"no_water":
+				met = cleared >= n and int(run_stats.get("water_built", 0)) == 0
+			"few_towers":
+				met = cleared >= n \
+						and int(run_stats.get("towers_built", 0)) <= int(goal.get("towers", 10))
+			"no_sell":
+				met = cleared >= n and int(run_stats.get("sold", 0)) == 0
+			"kills":
+				met = int(run_stats.get("kills", 0)) >= n
+			"rich":
+				met = int(run_stats.get("peak_gold", 0)) >= n
+		if met:
+			mask |= 1 << i
+	return mask
+
+
+## Banks whatever the run has earned. Cheated runs earn nothing.
+func _award_stars() -> void:
+	if cheats_used:
+		return
+	var gained := Progress.record_stars(str(level_def["id"]), objective_mask())
+	if gained == 0:
+		return
+	var objectives: Array = TDData.objectives_for(level_def)
+	for i in objectives.size():
+		if gained & (1 << i) != 0:
+			fx_text(Vector2(640.0, 210.0 + float(i) * 26.0),
+					"★  %s" % str(objectives[i]["text"]), Color("ffd54f"), 20)
+
+
 func _end_wave() -> void:
 	in_wave = false
+	run_stats["cleared"] = wave
 	# Gold Mines pay out between waves.
 	var mined := 0
 	for t: Tower in occupied.values():
@@ -613,6 +666,8 @@ func _end_wave() -> void:
 	preview.announce()
 	Audio.play("wave_clear", -6.0, 0.0)
 	fx_text(Vector2(640.0, 130.0), "Wave %d cleared  +$%d" % [wave, bonus], Color("66bb6a"), 24)
+	run_stats["peak_gold"] = maxi(int(run_stats.get("peak_gold", 0)), gold)
+	_award_stars()
 
 
 ## Builds a flat, time-stamped spawn list for the given wave number, scaled by
@@ -781,6 +836,7 @@ func _on_enemy_leaked(e: Enemy) -> void:
 	run_stats["enemy_leaks"] = leaked_kinds
 	if not Cheats.god_mode:
 		lives -= e.leak_damage
+		run_stats["untouched"] = false
 	if e.steal_gold > 0 and gold > 0 and not Cheats.god_mode:
 		# Cutpurses take gold on their way past.
 		var stolen: int = mini(gold, e.steal_gold)
@@ -927,6 +983,7 @@ func _trigger_game_over() -> void:
 	_select(null)
 	Progress.clear_run(str(level_def["id"]))
 	var reached := maxi(0, wave - 1)
+	_award_stars()
 	var reward := _bank_reward()
 	# A cheated run never sets a record.
 	var record := not cheats_used and Progress.record_wave(str(level_def["id"]), reached)
@@ -937,10 +994,11 @@ func _trigger_game_over() -> void:
 		payout = "+%d XP   +%d coins" % [int(reward["xp"]), int(reward["coins"])]
 		if bool(reward["levelled"]):
 			payout += "     LEVEL %d!" % int(reward["level_after"])
-	lbl_over.text = "%s (%s) — you held out for %d waves.\nScore %d   Towers %d   Leaks %d\n%s\n%s" \
+	lbl_over.text = "%s (%s) — you held out for %d waves.\nScore %d   Towers %d   Leaks %d\n%s\n%s\n%s" \
 			% [level_def["name"], str(TDData.tier_of(level_def)["name"]), reached, score,
 			occupied.size(), leaked_total,
-			"New record!" if record else "Best on this map: wave %d" % best_wave, payout]
+			"New record!" if record else "Best on this map: wave %d" % best_wave, payout,
+			objective_summary()]
 	_update_hud()
 	if surrendered:
 		lbl_over_title.text = "Run ended"
@@ -1309,6 +1367,29 @@ static func describe_enemy(e: Enemy) -> String:
 	if note != "":
 		text += "\n" + note
 	return text
+
+
+## The three objectives with a tick against the ones this run has managed
+## and a star against the ones the account already holds.
+func objective_lines() -> Array:
+	var mask := objective_mask()
+	var held := Progress.stars_for(str(level_def["id"]))
+	var out: Array = []
+	for i in TDData.objectives_for(level_def).size():
+		var goal: Dictionary = TDData.objectives_for(level_def)[i]
+		var bit := 1 << i
+		var mark := "☆"
+		if mask & bit != 0:
+			mark = "★"
+		elif held & bit != 0:
+			mark = "✓"
+		out.append("%s  %s" % [mark, str(goal["text"])])
+	return out
+
+
+func objective_summary() -> String:
+	var held := Progress.star_count(str(level_def["id"]))
+	return "Stars %d/3 — %s" % [held, "  ".join(objective_lines())]
 
 
 func _refresh_creep_tip() -> void:
@@ -1849,8 +1930,8 @@ func _refresh_info(preview: String = "") -> void:
 		return
 
 	info_title.text = str(level_def["name"])
-	info_body.text = "%s\n\nDrag a tower from the palette onto the map, or click the card then click a cell. Click a placed tower to install ranks (U buys the cheapest, X sells).\nSpace starts a wave early for gold. A auto, T target, P pause, F speed, M menu." \
-			% level_def["blurb"]
+	info_body.text = "%s\n%s\nDrag a tower onto the map, or click a card then a cell. Click a placed tower to install ranks (U buys the cheapest, X sells). Space starts a wave early for gold. A auto, T target, P pause, F speed, M menu." \
+			% [level_def["blurb"], "\n".join(objective_lines())]
 
 
 func _show_selected_info() -> void:

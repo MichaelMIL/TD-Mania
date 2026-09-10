@@ -59,19 +59,15 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
       mortar shell under a Drake does nothing. Flyers are drawn lifted with
       wings over a hard shadow, their readout chips are winged, and the
       palette marks ground-only towers.
-- [ ] **Per-map objectives and stars.** All 20 maps currently say "go as deep
-      as you can". Add goals like *survive 15 waves*, *lose no lives*, *clear
-      it without water towers*, stored per map in `progress.gd` alongside the
-      best-wave record.
-- [x] **Data-driven waves.** *Implemented 2026-09-10.* `_build_wave()` is a
-      loop over `TDData.WAVE_RULES` / `BOSS_WAVE` — one rule per creep kind
-      with `from`, `every`/`offset`, group size, spacing and lead-in.
-      `AREA_WAVES` layers per-area flavour on top (`tweak` a kind, `add` a
-      group, `drop` one), so the Wastes send early ashwalkers in packs, the
-      Riverlands run fast and light, the Frozen Coast leans on armour and
-      menders, and the Delta throws more of everything sooner. The base
-      curve is byte-identical to the old hardcoded builder, pinned by golden
-      compositions in the suite, and `dev/dev_waves.tscn` prints the curve.
+- [x] **Per-map objectives and stars.** *Implemented 2026-09-10.* Three per
+      map, a star each: clear a target wave (eased by tier), reach a wave
+      without losing a life, and the map's own `goal` — no water towers, a
+      tower budget, a kill count, no selling, or holding a sum of gold.
+      `TDData.objectives_for()` builds them, `Game.objective_mask()` judges
+      the run from what it actually did, stars are banked per map in
+      `Progress.stars` (union across attempts, nothing for a cheated run),
+      and they show on the level cards, in the account bar, on the in-match
+      info panel and on the defeat card.
 - [ ] **Tech respec.** Coins are spent permanently with no way to experiment.
       A paid respec button on the tech screen would encourage trying builds.
 

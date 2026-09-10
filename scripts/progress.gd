@@ -30,6 +30,8 @@ static var stats: Dictionary = {}
 ## Runs the player left mid-way, keyed by level id: every map keeps its own,
 ## so starting one map never discards the save on another.
 static var runs: Dictionary = {}
+## Objective stars earned per map: level id -> bitmask of objectives met.
+static var stars: Dictionary = {}
 
 ## Reward weights. A run pays out on waves survived and score, scaled by the
 ## map's difficulty tier.
@@ -128,8 +130,9 @@ static func migrate_legacy() -> void:
 ##   1  pre-slots, at most one parked run under [run] state
 ##   2  one parked run per map under [runs], run stats without the per-kind
 ##      kill and leak tallies
-##   3  current: versioned, and every parked run carries the full stat set
-const SAVE_VERSION := 3
+##   3  versioned, and every parked run carries the full stat set
+##   4  current: per-map objective stars under [stars]
+const SAVE_VERSION := 4
 
 ## The keys a parked run's stats must have. Kept here rather than imported
 ## from game.gd so migration does not depend on the match scene.
@@ -166,6 +169,11 @@ static func migrate_config(cfg: ConfigFile, from_version: int) -> int:
 					cfg.set_value("runs", level_id, legacy)
 				if cfg.has_section("run"):
 					cfg.erase_section("run")
+			3:
+				# Stars are new in 4. An older save simply has none yet, so
+				# there is nothing to convert - the arm exists so the chain
+				# stays explicit and the next change has a pattern to copy.
+				pass
 			2:
 				# Run stats gained per-kind tallies; fill them in so the
 				# match does not index a key that was never saved.
@@ -219,6 +227,7 @@ static func apply_config(cfg: ConfigFile) -> void:
 	bests = {}
 	runs = {}
 	stats = {}
+	stars = {}
 	tower_ranks = {}
 	xp = int(cfg.get_value("progress", "xp", 0))
 	coins = int(cfg.get_value("progress", "coins", 0))
@@ -239,6 +248,9 @@ static func apply_config(cfg: ConfigFile) -> void:
 	if cfg.has_section("towers"):
 		for key: String in cfg.get_section_keys("towers"):
 			tower_ranks[key] = Array(cfg.get_value("towers", key, []))
+	if cfg.has_section("stars"):
+		for key: String in cfg.get_section_keys("stars"):
+			stars[key] = int(cfg.get_value("stars", key, 0))
 
 
 static func save_state() -> void:
@@ -258,6 +270,8 @@ static func save_state() -> void:
 		cfg.set_value("stats", key, stats[key])
 	cfg.set_value("options", "sfx", volume("sfx"))
 	cfg.set_value("options", "music", volume("music"))
+	for key: String in stars:
+		cfg.set_value("stars", key, int(stars[key]))
 	for key: String in runs:
 		cfg.set_value("runs", key, runs[key])
 	cfg.save(slot_path(slot))
@@ -412,6 +426,43 @@ static func tower_rank_total(type_id: String) -> int:
 
 # --------------------------------------------------------------- best waves
 
+## Objectives are a bitmask so a run can pick up whichever it managed and
+## the account keeps the union of every attempt.
+static func stars_for(level_id: String) -> int:
+	load_state()
+	return int(stars.get(level_id, 0))
+
+
+static func star_count(level_id: String) -> int:
+	var mask := stars_for(level_id)
+	var count := 0
+	for bit in 3:
+		if mask & (1 << bit) != 0:
+			count += 1
+	return count
+
+
+static func total_stars() -> int:
+	load_state()
+	var total := 0
+	for key: String in stars:
+		total += star_count(key)
+	return total
+
+
+## Adds whatever this run earned. Returns the newly earned bits, so the game
+## can say which star just dropped.
+static func record_stars(level_id: String, mask: int) -> int:
+	load_state()
+	var had := int(stars.get(level_id, 0))
+	var gained := mask & ~had
+	if gained == 0:
+		return 0
+	stars[level_id] = had | mask
+	save_state()
+	return gained
+
+
 static func best_wave(level_id: String) -> int:
 	load_state()
 	return int(bests.get(level_id, 0))
@@ -477,6 +528,7 @@ static func use_clean_state() -> void:
 	options = {}
 	tower_ranks = {}
 	stats = {}
+	stars = {}
 	runs = {}
 	# Balance overrides are excluded too, so a simulation measures the numbers
 	# in data.gd rather than whatever the developer was last experimenting with.
@@ -491,6 +543,7 @@ static func reset() -> void:
 	options = {}
 	tower_ranks = {}
 	stats = {}
+	stars = {}
 	runs = {}
 	if not read_only:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(slot_path(slot)))
