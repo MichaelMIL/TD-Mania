@@ -257,6 +257,7 @@ static func apply_config(cfg: ConfigFile) -> void:
 		for key: String in cfg.get_section_keys("keys"):
 			keys[key] = int(cfg.get_value("keys", key, 0))
 	options["window_scale"] = float(cfg.get_value("options", "window_scale", 1.0))
+	options["frame_cap"] = int(cfg.get_value("options", "frame_cap", 60))
 
 
 static func save_state() -> void:
@@ -281,6 +282,7 @@ static func save_state() -> void:
 	for key: String in keys:
 		cfg.set_value("keys", key, int(keys[key]))
 	cfg.set_value("options", "window_scale", window_scale())
+	cfg.set_value("options", "frame_cap", frame_cap())
 	for key: String in runs:
 		cfg.set_value("runs", key, runs[key])
 	cfg.save(slot_path(slot))
@@ -360,6 +362,19 @@ static func key_name(action: String) -> String:
 
 ## Multiples of the design resolution the window can be set to.
 const WINDOW_SCALES: Array = [0.75, 1.0, 1.25, 1.5]
+
+
+## Frame cap in frames a second; 0 means "as fast as the display allows".
+static func frame_cap() -> int:
+	load_state()
+	return int(options.get("frame_cap", 60))
+
+
+static func set_frame_cap(value: int) -> void:
+	load_state()
+	options["frame_cap"] = value
+	save_state()
+	App.apply_cap()
 
 
 static func window_scale() -> float:
@@ -843,24 +858,54 @@ static func buy(id: String) -> bool:
 
 
 ## Multiplicative tech bonus for `key` (1.0 when nothing is bought).
+## Every tower asks for these several times a frame, and each answer used to
+## walk the whole TECH table with a pow() per node. They change only when a
+## rank is bought, so they are cached against a hash of the rank table —
+## which also catches a test or a cheat writing `ranks` directly.
+static var _bonus_cache: Dictionary = {}
+static var _bonus_stamp: int = 0
+
+
+static func invalidate_bonuses() -> void:
+	_bonus_cache = {}
+	_bonus_stamp = 0
+
+
+static func _bonus_ready() -> void:
+	var stamp := ranks.hash()
+	if stamp != _bonus_stamp:
+		_bonus_stamp = stamp
+		_bonus_cache = {}
+
+
 static func bonus_mult(key: String) -> float:
 	load_state()
+	_bonus_ready()
+	var cache_key := "m:" + key
+	if _bonus_cache.has(cache_key):
+		return float(_bonus_cache[cache_key])
 	var total := 1.0
 	for t: Dictionary in TECH:
 		var mods: Dictionary = t["mods"]
 		if mods.has(key):
 			total *= pow(float(mods[key]), float(rank(str(t["id"]))))
+	_bonus_cache[cache_key] = total
 	return total
 
 
 ## Additive tech bonus for `key` (0.0 when nothing is bought).
 static func bonus_add(key: String) -> float:
 	load_state()
+	_bonus_ready()
+	var cache_key := "a:" + key
+	if _bonus_cache.has(cache_key):
+		return float(_bonus_cache[cache_key])
 	var total := 0.0
 	for t: Dictionary in TECH:
 		var mods: Dictionary = t["mods"]
 		if mods.has(key):
 			total += float(mods[key]) * float(rank(str(t["id"])))
+	_bonus_cache[cache_key] = total
 	return total
 
 

@@ -57,6 +57,10 @@ var dead: bool = false
 ## aircraft all sit at the default priority) so the targeting grid the game
 ## builds on the first query of a frame already holds their new positions.
 const PROCESS_ORDER := -10
+## How often an undisturbed creep rebuilds its art.
+const IDLE_REDRAW_HZ := 12.0
+
+var _idle_clock: float = 0.0
 
 
 func _init() -> void:
@@ -126,6 +130,12 @@ func _process(delta: float) -> void:
 			burn_dps = 0.0
 			queue_redraw()
 	wobble += delta * 9.0
+	# The bob and the wing beat are the only reason a walking creep redraws.
+	# Twelve times a second is indistinguishable and costs a fifth as much.
+	_idle_clock += delta
+	if _idle_clock >= 1.0 / IDLE_REDRAW_HZ:
+		_idle_clock = 0.0
+		queue_redraw()
 	if charge_period > 0.0:
 		# Sprinters build up, burst forward, then settle again.
 		charge_clock += delta

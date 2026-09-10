@@ -129,6 +129,18 @@ func _build() -> void:
 	var full := _button("Fullscreen", 110.0)
 	full.pressed.connect(_on_fullscreen)
 	scale_row.add_child(full)
+	var cap_row := HBoxContainer.new()
+	cap_row.add_theme_constant_override("separation", 6)
+	window_col.add_child(cap_row)
+	cap_row.add_child(_label("Frame cap", 13, Color("e3f2fd")))
+	for value: int in App.CAPS:
+		var b := _button("%d fps" % value if value > 0 else "Display", 84.0)
+		b.pressed.connect(_on_cap.bind(value))
+		b.set_meta("cap", value)
+		cap_row.add_child(b)
+	window_col.add_child(_label("A lower cap is cooler and quieter; 60 looks the same as 120 here.",
+			11, Color(1, 1, 1, 0.45)))
+
 	window_col.add_child(_label("The board is drawn at %d x %d; the window is a multiple of that."
 			% [int(ProjectSettings.get_setting("display/window/size/viewport_width")),
 			int(ProjectSettings.get_setting("display/window/size/viewport_height"))],
@@ -215,6 +227,12 @@ func _on_scale(value: float) -> void:
 	_refresh()
 
 
+func _on_cap(value: int) -> void:
+	Progress.set_frame_cap(value)
+	_say("Frame cap %s." % ("%d fps" % value if value > 0 else "off"))
+	_refresh()
+
+
 func _on_fullscreen() -> void:
 	var full := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if full
@@ -277,6 +295,12 @@ func _refresh() -> void:
 			var mine: bool = is_equal_approx(float(child.get_meta("scale")),
 					Progress.window_scale())
 			child.modulate = Color("9ce89c") if mine else Color.WHITE
+	for row: Node in scale_row.get_parent().get_children():
+		for child in row.get_children() if row is HBoxContainer else []:
+			if child is Button and child.has_meta("cap"):
+				child.modulate = Color("9ce89c") \
+						if int(child.get_meta("cap")) == Progress.frame_cap() \
+						else Color.WHITE
 	for action: String in key_rows:
 		var b: Button = key_rows[action]
 		b.text = "press a key…" if listening == action else Progress.key_name(action)

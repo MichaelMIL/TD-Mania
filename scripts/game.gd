@@ -47,6 +47,8 @@ var routes: Array = []
 var path_points: PackedVector2Array = PackedVector2Array()
 var terrain: Dictionary = {}
 var occupied: Dictionary = {}
+## Command Posts only, so aura lookups do not walk the whole board.
+var support_towers: Array = []
 var enemies: Array = []
 
 ## Creeps bucketed by a coarse grid so a tower tests the handful of enemies
@@ -403,6 +405,8 @@ func _place_tower(type_id: String, c: Vector2i) -> Tower:
 	t.position = cell_center(c)
 	layer_towers.add_child(t)
 	occupied[c] = t
+	if t.is_support():
+		support_towers.append(t)
 	run_stats["towers_built"] = int(run_stats.get("towers_built", 0)) + 1
 	if int(TDData.tower_def(type_id)["terrain"]) == TDData.Terrain.WATER:
 		run_stats["water_built"] = int(run_stats.get("water_built", 0)) + 1
@@ -505,6 +509,7 @@ func _sell_selected() -> void:
 	Audio.play("sell", -8.0)
 	run_stats["sold"] = int(run_stats.get("sold", 0)) + 1
 	occupied.erase(selected.cell)
+	support_towers.erase(selected)
 	selected.queue_free()
 	_select(null)
 	hud.refresh_info()
@@ -848,6 +853,7 @@ func _capture_run() -> Dictionary:
 
 ## Rebuilds a parked run: board, economy and every tower that was standing.
 func _restore_run(state: Dictionary) -> void:
+	support_towers.clear()
 	if state.is_empty():
 		return
 	wave = int(state.get("wave", 0))
@@ -877,6 +883,8 @@ func _restore_run(state: Dictionary) -> void:
 		t.invested = int(entry.get("invested", TDData.tower_def(type_id)["cost"]))
 		layer_towers.add_child(t)
 		occupied[cell] = t
+		if t.is_support():
+			support_towers.append(t)
 	break_timer = PREP_TIME
 
 
@@ -1189,8 +1197,10 @@ func explode(pos: Vector2, radius: float, damage: float, color: Color,
 func aura_at(pos: Vector2) -> Dictionary:
 	var best_damage := 0.0
 	var best_rate := 0.0
-	for t: Tower in occupied.values():
-		if not is_instance_valid(t) or not t.is_support():
+	# Only the posts are worth checking. Walking every tower here was
+	# quadratic in the number of towers on the board.
+	for t: Tower in support_towers:
+		if not is_instance_valid(t):
 			continue
 		if t.position.distance_to(pos) > t.stat("range"):
 			continue

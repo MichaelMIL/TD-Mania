@@ -518,7 +518,42 @@ scripts/cursor.gd         build preview (ghost tower, range, valid-cell hints)
 scripts/fx.gd             rings, sparks, floating text
 scripts/art.gd            optional sprite override loader
 scripts/audio.gd          procedural sound bank, voice pool, music (autoloaded)
+scripts/app.gd            frame cap and background throttling (autoloaded)
 ```
+
+### What the game costs the machine
+
+`dev/dev_perf.tscn` is the profiler: a windowed run with the board saturated
+and a wave in flight, vsync off and the frame cap lifted, reporting average
+and 95th-percentile frame time, script time, draw calls and node count.
+`-- --off towers,draw,hud,water,enemies` silences parts of the frame so the
+cost can be attributed rather than guessed at, and `--towers N` / `--wave N`
+set the scenario.
+
+That is how the real cost was found: a saturated board ran at 20 fps
+(48.8 ms a frame), and hiding the tower layer took it to 4.3 ms — so the
+time was going on *rebuilding* ~5,900 draw commands every frame, not on the
+GPU and not on the game logic. What changed:
+
+- A tower redraws only when its turret actually turned (past 0.012 rad),
+  fired, or changed beam state. Nothing else about it changes most frames.
+- Animations that never stop — support rings, mine glow, tar bubbles, the
+  creep bob and wing beat, water ripples — run at 12 Hz instead of 60.
+  A creep walking needs no redraw at all: its position is a node transform.
+- Tech bonuses (`Progress.bonus_mult`) and merged track mods
+  (`Tower.mods()`) are cached against a hash of what they depend on, instead
+  of being recomputed several times per tower per frame.
+- Aura lookups walk a list of Command Posts rather than every tower, which
+  was quadratic in board size.
+
+Same board now runs at 113 fps (8.9 ms), which is the display ceiling on the
+machine it was measured on.
+
+On top of that the game ships **capped at 60 fps**
+(`application/run/max_fps`, changeable in Options) rather than rendering as
+fast as a 120 Hz display allows, and the `App` autoload drops it to 10 fps
+whenever the window is in the background — a tower defence left open should
+not keep a core busy.
 
 ### The full-speed smoke test
 

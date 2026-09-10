@@ -4,13 +4,17 @@ config_version=5
 [application]
 
 config/name="TD Mania"
-config/description="Wave-based tower defense: four maps, seven towers, endless waves."
+config/description="Wave-based tower defence: twenty maps, eighteen towers, endless waves."
 run/main_scene="res://main.tscn"
+; A 2D tower defence has no business rendering at 120 Hz on a laptop;
+; the App autoload lowers this further while the window is unfocused.
+run/max_fps=60
 config/features=PackedStringArray("4.7", "Forward Plus")
 
 [autoload]
 
 Audio="*res://scripts/audio.gd"
+App="*res://scripts/app.gd"
 
 [display]
 

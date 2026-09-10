@@ -216,6 +216,7 @@ func _ready() -> void:
 	_check_respec()
 	_check_options()
 	_check_art_prompts()
+	_check_frame_budget()
 	_check_enemy_kinds()
 	_check_cheats()
 	_check_audio()
@@ -1516,6 +1517,58 @@ func _check_targeting() -> void:
 
 
 
+
+
+
+
+## What the game costs the machine. These are the rules that keep it cheap;
+## the numbers themselves are measured by dev/dev_perf.tscn.
+func _check_frame_budget() -> void:
+	# The frame cap must exist, default sanely, and be saveable.
+	check("the game ships with a frame cap",
+			int(ProjectSettings.get_setting("application/run/max_fps", 0)) == 60)
+	check("the cap list offers something sensible",
+			App.CAPS.has(60) and App.CAPS.has(0))
+	Progress.use_clean_state()
+	Progress.read_only = true
+	check("the default cap is 60", Progress.frame_cap() == 60)
+	var cfg := ConfigFile.new()
+	cfg.set_value("meta", "version", Progress.SAVE_VERSION)
+	cfg.set_value("options", "frame_cap", 30)
+	Progress.apply_config(cfg)
+	check("a saved cap is read back", Progress.frame_cap() == 30)
+
+	# Backgrounded, the game must idle rather than keep a core busy.
+	App.focused = false
+	App.apply_cap()
+	check("an unfocused window drops to a trickle",
+			Engine.max_fps == App.BACKGROUND_FPS and Engine.max_fps <= 15)
+	App.focused = true
+	App.apply_cap()
+	check("and comes back to the chosen cap", Engine.max_fps == 30)
+	Progress.use_clean_state()
+	App.apply_cap()
+
+	# Redraw discipline: a tower that has not moved must not rebuild its art,
+	# which is what made a full board cost 50 ms a frame.
+	var t := Tower.new()
+	t.game = game
+	t.setup("gun", Vector2i.ZERO)
+	add_child(t)
+	t._redraw_if_changed()
+	check("a settled tower asks for no redraw", not t._needs_redraw())
+	t.turret_angle += 0.5
+	check("but a turning one does", t._needs_redraw())
+	t._redraw_if_changed()
+	check("and settles again once drawn", not t._needs_redraw())
+	t.recoil = 1.0
+	check("firing redraws too", t._needs_redraw())
+	remove_child(t)
+	t.free()
+
+	check("idle animations are throttled, not stopped",
+			Tower.IDLE_REDRAW_HZ > 0.0 and Tower.IDLE_REDRAW_HZ <= 20.0
+			and Enemy.IDLE_REDRAW_HZ <= 20.0 and WaterLayer.RIPPLE_HZ <= 20.0)
 
 
 ## The sprite drop-in has to stay honest: a prompt for every name the game

@@ -15,9 +15,18 @@ func _ready() -> void:
 			cells.append(key)
 
 
+## The surface ripples on its own, so it is the one layer that must redraw
+## with nothing happening. Twelve times a second is plenty for water.
+const RIPPLE_HZ := 12.0
+
+var _ripple_clock: float = 0.0
+
+
 func _process(delta: float) -> void:
 	t += delta
-	if not cells.is_empty():
+	_ripple_clock += delta
+	if not cells.is_empty() and _ripple_clock >= 1.0 / RIPPLE_HZ:
+		_ripple_clock = 0.0
 		queue_redraw()
 
 

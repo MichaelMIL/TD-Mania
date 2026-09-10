@@ -64,8 +64,19 @@ func def() -> Dictionary:
 	return TDData.tower_def(type_id)
 
 
+## Rebuilding the merged track mods meant a fresh dictionary several times
+## per tower per frame. Ranks change only when something is installed, so
+## the result is cached against a hash of them.
+var _mods_cache: Dictionary = {}
+var _mods_stamp: int = -1
+
+
 func mods() -> Dictionary:
-	return TDData.mods_for(type_id, ranks)
+	var stamp := ranks.hash()
+	if stamp != _mods_stamp:
+		_mods_stamp = stamp
+		_mods_cache = TDData.mods_for(type_id, ranks)
+	return _mods_cache
 
 
 ## Total ranks bought across all tracks; drives the level pips and the label.
@@ -357,6 +368,50 @@ func sell_value() -> int:
 	return int(float(invested) * (0.7 + Progress.bonus_add("sell_refund_add")))
 
 
+## Rebuilding a tower's ~35 draw commands every frame is what the machine was
+## actually spending its time on: 150 towers came to 5,900 commands a frame
+## and 50 ms of script. Nothing about a tower changes most frames, so a
+## redraw is asked for only when something visible moved.
+const REDRAW_ANGLE := 0.012
+## Idle animations (support rings, mine glow, tar bubbles) run at this many
+## frames a second instead of the full rate. Nobody can see the difference.
+const IDLE_REDRAW_HZ := 12.0
+
+var _drawn_angle: float = -99.0
+var _drawn_recoil: float = -1.0
+var _drawn_beam: bool = false
+var _drawn_targets: int = -1
+var _idle_clock: float = 0.0
+
+
+## True when enough has changed on screen to be worth rebuilding the art.
+func _needs_redraw() -> bool:
+	if beam_on != _drawn_beam or beam_targets.size() != _drawn_targets:
+		return true
+	if absf(angle_difference(turret_angle, _drawn_angle)) > REDRAW_ANGLE:
+		return true
+	# Recoil has to settle back to zero exactly, or the barrel sticks out.
+	return absf(recoil - _drawn_recoil) > 0.01
+
+
+func _redraw_if_changed() -> void:
+	if not _needs_redraw():
+		return
+	_drawn_angle = turret_angle
+	_drawn_recoil = recoil
+	_drawn_beam = beam_on
+	_drawn_targets = beam_targets.size()
+	queue_redraw()
+
+
+## Animations that never stop still redraw, just not sixty times a second.
+func _redraw_idle(delta: float) -> void:
+	_idle_clock += delta
+	if _idle_clock >= 1.0 / IDLE_REDRAW_HZ:
+		_idle_clock = 0.0
+		queue_redraw()
+
+
 func _process(delta: float) -> void:
 	buff_timer -= delta
 	if buff_timer <= 0.0:
@@ -371,28 +426,28 @@ func _process(delta: float) -> void:
 
 	if is_support():
 		support_pulse += delta
-		queue_redraw()
+		_redraw_idle(delta)
 		return
 
 	if income() > 0.0:
 		# Mines just sit there and pay out when the wave ends.
 		support_pulse += delta
-		queue_redraw()
+		_redraw_idle(delta)
 		return
 
 	if is_field():
 		_process_field(delta)
-		queue_redraw()
+		_redraw_idle(delta)
 		return
 
 	if is_pulse():
 		_process_pulse(delta)
-		queue_redraw()
+		_redraw_idle(delta)
 		return
 
 	if is_air():
 		_process_air(delta)
-		queue_redraw()
+		_redraw_idle(delta)
 		return
 
 	var rng := stat("range")
@@ -425,7 +480,7 @@ func _process(delta: float) -> void:
 	else:
 		cooldown = maxf(0.0, cooldown - delta)
 	recoil = maxf(0.0, recoil - delta * 7.0)
-	queue_redraw()
+	_redraw_if_changed()
 
 
 ## Slow field: everything in range is kept slowed while it stands here.

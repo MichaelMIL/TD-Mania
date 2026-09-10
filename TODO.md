@@ -132,17 +132,21 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
 
 ## Do last
 
-- [ ] **Cut what the game costs the machine.** *Reported 2026-09-10 — the
-      user's SoC runs hot playing it.* The targeting grid helped the CPU side,
-      but the draw path has not been looked at: every tower, creep, projectile
-      and effect is an individual `_draw()` node redrawn each frame, the water
-      layer animates continuously, `_update_hud()` rebuilds label text every
-      frame, and nothing throttles when the window is idle or the game is
-      paused. Profile first (Godot's monitors: draw calls, objects, physics
-      vs render time), then attack the biggest cost — likely `queue_redraw()`
-      on things that did not change, plus capping the frame rate and dropping
-      to a low-power idle when nothing is moving. Do this after everything
-      else, so it profiles the finished game rather than a moving target.
+- [x] **Cut what the game costs the machine.** *Implemented 2026-09-10.*
+      Profiled first with the new `dev/dev_perf.tscn` (vsync off, cap
+      lifted, `--off towers,draw,hud,water,enemies` to attribute the cost).
+      A saturated board ran at **20 fps / 48.8 ms a frame**, and hiding the
+      tower layer took it to 4.3 ms — so the cost was rebuilding ~5,900 draw
+      commands every frame, not the GPU and not the logic. Fixes: towers
+      redraw only when the turret actually turned, fired or changed state;
+      idle animations (support rings, mines, tar, creep bob, water ripples)
+      run at 12 Hz instead of 60; tech bonuses and merged track mods are
+      cached against a hash instead of recomputed several times per tower
+      per frame; aura lookups walk a list of Command Posts instead of every
+      tower. Same board now runs at **113 fps / 8.9 ms**, display-bound. The
+      game also ships capped at 60 fps (`application/run/max_fps`, and a
+      Frame cap row in Options) and drops to 10 fps whenever the window is
+      in the background, via the new `App` autoload.
 
 ## Notes
 

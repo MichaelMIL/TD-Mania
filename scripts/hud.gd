@@ -12,6 +12,8 @@ extends Node
 ## match.
 
 var game: Node = null
+## Set by the perf harness to price what the HUD costs per frame.
+var frozen: bool = false
 
 var info_hover: Label
 var track_buttons: Array = []
@@ -543,6 +545,8 @@ func sync_sound_button() -> void:
 
 
 func update() -> void:
+	if frozen:
+		return
 	lbl_lives.text = "Lives %d" % game.lives
 	lbl_gold.text = "Gold $%d" % game.gold
 	lbl_wave.text = "Wave %d" % maxi(1, game.wave)
