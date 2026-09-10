@@ -213,6 +213,7 @@ func _ready() -> void:
 	_check_wave_affixes()
 	_check_boss_abilities()
 	_check_hazards()
+	_check_area_music()
 	_check_modifiers()
 	_check_flyers()
 	_check_board_tooltips()
@@ -2375,6 +2376,42 @@ func _check_modifiers() -> void:
 	game.support_towers.clear()
 	game.modifiers = saved
 	game._select(null)
+
+
+
+
+## Music is per area: the same loop, tuned differently.
+func _check_area_music() -> void:
+	var missing: Array = []
+	for area: Dictionary in TDData.AREAS:
+		if not Audio.AREA_MUSIC.has(str(area["id"])):
+			missing.append(str(area["id"]))
+		elif not Audio.bank.has("music_" + str(area["id"])):
+			missing.append(str(area["id"]) + " (unsynthesised)")
+	check("every area has its own pad (%s)" % ", ".join(missing), missing.is_empty())
+	var lengths: Array = []
+	var same := false
+	for area: Dictionary in TDData.AREAS:
+		var stream: AudioStreamWAV = Audio.bank["music_" + str(area["id"])]
+		if lengths.has(stream.data.size()):
+			same = true
+		lengths.append(stream.data.size())
+		if stream.data.size() < 1000 or not stream.loop_mode == AudioStreamWAV.LOOP_FORWARD:
+			same = true
+	check("and they are actually different loops, all of them looping", not same)
+
+	# Switching areas swaps the track; staying put does not restart it.
+	Audio.play_music(true, "frozen")
+	var frozen_track: String = Audio.music_track
+	Audio.play_music(true, "frozen")
+	check("staying in an area keeps the same track",
+			Audio.music_track == frozen_track)
+	Audio.play_music(true, "delta")
+	check("moving to another area changes it", Audio.music_track != frozen_track)
+	Audio.play_music(true, "nowhere")
+	check("an unknown area falls back to the plain loop",
+			Audio.music_track == "music")
+	Audio.play_music(false)
 
 
 ## Map hazards: one map-wide rule, said out loud.

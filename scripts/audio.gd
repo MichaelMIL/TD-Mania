@@ -21,6 +21,8 @@ var music_player: AudioStreamPlayer
 var beam_voices: int = 0
 var sfx_volume: float = 0.8
 var music_volume: float = 0.35
+## Which pad is loaded, so switching areas is a change and staying is not.
+var music_track: String = "music"
 
 
 func _ready() -> void:
@@ -37,6 +39,7 @@ func _ready() -> void:
 	add_child(beam_player)
 	music_player = AudioStreamPlayer.new()
 	music_player.stream = bank.get("music")
+	music_track = "music"
 	add_child(music_player)
 	_apply_volumes()
 
@@ -80,9 +83,17 @@ func _process(_delta: float) -> void:
 	beam_voices = 0
 
 
-func play_music(on: bool) -> void:
+## `area` picks the pad; an unknown or empty one keeps the generic loop.
+## Switching areas restarts the track, staying put does not.
+func play_music(on: bool, area: String = "") -> void:
 	if music_player == null:
 		return
+	var wanted: String = "music_" + area if bank.has("music_" + area) else "music"
+	if wanted != music_track:
+		music_track = wanted
+		music_player.stream = bank.get(wanted)
+		if music_player.playing:
+			music_player.stop()
 	if on and music_volume > 0.001:
 		if not music_player.playing:
 			music_player.play()
@@ -94,7 +105,8 @@ func set_volumes(sfx: float, music: float) -> void:
 	sfx_volume = clampf(sfx, 0.0, 1.0)
 	music_volume = clampf(music, 0.0, 1.0)
 	_apply_volumes()
-	play_music(music_volume > 0.001)
+	play_music(music_volume > 0.001, music_track.trim_prefix("music_")
+			if music_track != "music" else "")
 
 
 func _apply_volumes() -> void:
@@ -121,6 +133,8 @@ func _build_bank() -> void:
 	bank["click"] = _wav(_click())
 	bank["beam"] = _wav(_beam(), true)
 	bank["music"] = _wav(_music(), true)
+	for area_id: String in AREA_MUSIC:
+		bank["music_" + area_id] = _wav(_music(AREA_MUSIC[area_id]), true)
 	# A real file always wins over the generated version.
 	for name: String in bank.keys():
 		var path := ASSET_DIR + name + ".wav"
@@ -371,13 +385,26 @@ func _beam() -> PackedFloat32Array:
 
 
 ## Slow four-chord pad that loops cleanly: the ambient bed.
-func _music() -> PackedFloat32Array:
-	var bar := 2.4
+## Each area gets its own pad: the same shape of loop, tuned differently.
+## Cheap variety - a set of frequencies and a tempo, not new content.
+const AREA_MUSIC: Dictionary = {
+	"greenlands": {"bar": 2.4, "shift": 1.0, "bright": 1.0},
+	"riverlands": {"bar": 2.8, "shift": 1.06, "bright": 1.15},
+	"wastes": {"bar": 2.2, "shift": 0.94, "bright": 0.8},
+	"frozen": {"bar": 3.1, "shift": 1.19, "bright": 1.3},
+	"delta": {"bar": 2.0, "shift": 0.84, "bright": 0.7},
+}
+
+
+func _music(shape: Dictionary = {}) -> PackedFloat32Array:
+	var bar := float(shape.get("bar", 2.4))
+	var shift := float(shape.get("shift", 1.0))
+	var bright := float(shape.get("bright", 1.0))
 	var chords: Array = [
-		[220.0, 261.63, 329.63],   # Am
-		[174.61, 220.0, 261.63],   # F
-		[196.0, 246.94, 293.66],   # G
-		[164.81, 207.65, 246.94],  # E minor-ish resolve
+		[220.0 * shift, 261.63 * shift, 329.63 * shift],   # Am
+		[174.61 * shift, 220.0 * shift, 261.63 * shift],   # F
+		[196.0 * shift, 246.94 * shift, 293.66 * shift],   # G
+		[164.81 * shift, 207.65 * shift, 246.94 * shift],  # E minor-ish resolve
 	]
 	var n := _len(bar * float(chords.size()))
 	var out := PackedFloat32Array()
@@ -390,7 +417,7 @@ func _music() -> PackedFloat32Array:
 		var swell := sin(PI * local)
 		var value := 0.0
 		for freq: float in chords[index]:
-			value += _sine(freq, i) * 0.16 + _sine(freq * 2.0, i) * 0.05
+			value += _sine(freq, i) * 0.16 + _sine(freq * 2.0, i) * 0.05 * bright
 		value += _sine(float(chords[index][0]) * 0.5, i) * 0.12
 		out[i] = value * (0.35 + 0.65 * swell) * 0.5
 	return out

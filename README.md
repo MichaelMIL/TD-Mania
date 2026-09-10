@@ -77,6 +77,17 @@ Adding a field means bumping `SAVE_VERSION` and adding one `match` arm to
 `migrate_config()`; `_check_save_versioning()` migrates fabricated v1 and v2
 configs in memory and asserts the result.
 
+### Music per area
+
+The ambient pad is synthesised, so an area-flavoured version costs a
+handful of numbers rather than a new asset: the Frozen Coast runs slower,
+higher and brighter, the Iron Delta lower and darker, the Wastes drier and
+quicker (`Audio.AREA_MUSIC`). A match plays its area's loop, the menus play
+the plain one, and staying inside an area does not restart the track.
+
+Dropping `assets/audio/music_frozen.wav` — or any other name in the bank —
+still overrides the generated version.
+
 ## Progression
 
 Every run pays out **XP** and **coins**, scaled by waves survived, score and

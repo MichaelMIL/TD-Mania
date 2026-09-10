@@ -142,6 +142,8 @@ func _ready() -> void:
 	speeds = Progress.speeds()
 	# One map-wide rule, read once: towers and aircraft ask the game for it.
 	hazard = TDData.hazard_of(level_def)
+	# The area sets the tone, literally.
+	Audio.play_music(true, str(level_def.get("area", "")))
 	# Handicaps chosen on the level card. They are enforced here rather than
 	# checked afterwards, so an honest run is the only kind there is.
 	modifiers = TDData.selected_modifiers.duplicate()
