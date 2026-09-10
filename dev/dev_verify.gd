@@ -215,6 +215,7 @@ func _ready() -> void:
 	_check_hazards()
 	_check_area_music()
 	_check_colour_access()
+	_check_run_seed()
 	_check_modifiers()
 	_check_flyers()
 	_check_board_tooltips()
@@ -2381,6 +2382,40 @@ func _check_modifiers() -> void:
 
 
 
+
+
+
+
+## A run's randomness comes from one number, and that number travels with
+## the run.
+func _check_run_seed() -> void:
+	check("a run has a seed", game.run_seed != 0)
+	var state: Dictionary = game._capture_run()
+	check("parking a run keeps its seed",
+			int(state.get("seed", 0)) == game.run_seed)
+	check("and the handicaps it was played under",
+			state.has("modifiers"))
+	var original: int = game.run_seed
+	game.run_seed = 12345
+	game._restore_run(state)
+	check("resuming picks the run's own seed back up",
+			game.run_seed == original)
+
+	# The seed decides what the run does: same number, same rolls.
+	seed(original)
+	var first: Array = []
+	for i in 5:
+		first.append(randi())
+	seed(original)
+	var again: Array = []
+	for i in 5:
+		again.append(randi())
+	check("the same seed plays out the same way", first == again)
+	seed(original + 1)
+	var different: Array = []
+	for i in 5:
+		different.append(randi())
+	check("and a different one does not", first != different)
 
 
 ## Colour is not the only channel: lanes have shapes, tiers have marks, the

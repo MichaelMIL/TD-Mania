@@ -15,6 +15,9 @@ var speeds: Array = [1.0]
 var hazard: Dictionary = {}
 ## Handicaps chosen before the run started.
 var modifiers: Array = []
+## The seed every random decision in this run comes from. Saved with the
+## run and restored with it.
+var run_seed: int = 0
 
 
 func has_modifier(id: String) -> bool:
@@ -147,6 +150,11 @@ func _ready() -> void:
 	# Handicaps chosen on the level card. They are enforced here rather than
 	# checked afterwards, so an honest run is the only kind there is.
 	modifiers = TDData.selected_modifiers.duplicate()
+	# A run's randomness comes from one number, kept with the run, so a
+	# resumed run carries on the same way and a run can be described.
+	if run_seed == 0:
+		run_seed = randi() & 0x7fffffff
+	seed(run_seed)
 	if has_modifier("thin_lives"):
 		lives = maxi(1, lives / 2)
 	if TDData.resume_run:
@@ -1061,6 +1069,7 @@ func _capture_run() -> Dictionary:
 		"gold": gold, "lives": lives, "score": score, "leaked": leaked_total,
 		"claimed": maxi(early_claimed, wave if in_wave else early_claimed),
 		"stats": run_stats.duplicate(true), "towers": towers,
+		"seed": run_seed, "modifiers": modifiers.duplicate(),
 	}
 
 
@@ -1069,6 +1078,12 @@ func _restore_run(state: Dictionary) -> void:
 	support_towers.clear()
 	if state.is_empty():
 		return
+	# Pick the run's randomness back up where it was left, and keep the
+	# handicaps it was played under rather than whatever is ticked now.
+	run_seed = int(state.get("seed", run_seed))
+	seed(run_seed)
+	if state.has("modifiers"):
+		modifiers = (state["modifiers"] as Array).duplicate()
 	wave = int(state.get("wave", 0))
 	gold = int(state.get("gold", gold))
 	lives = int(state.get("lives", lives))

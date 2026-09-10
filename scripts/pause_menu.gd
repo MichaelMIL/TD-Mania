@@ -195,6 +195,6 @@ func _refresh() -> void:
 	music_value.text = "%d%%" % int(round(Progress.volume("music") * 100.0))
 	if game == null or not is_instance_valid(game):
 		return
-	lbl_state.text = "%s — wave %d of %d, %d lives, $%d in hand." % [
+	lbl_state.text = "%s — wave %d of %d, %d lives, $%d in hand.\nSeed %d" % [
 		game.level_def["name"], maxi(1, game.wave),
-		TDData.clear_wave(game.level_def), game.lives, game.gold]
+		TDData.clear_wave(game.level_def), game.lives, game.gold, game.run_seed]
