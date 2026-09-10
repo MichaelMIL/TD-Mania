@@ -37,6 +37,9 @@ var hit_flash: float = 0.0
 var push_fatigue: float = 0.0
 ## Flyers cut across the map and can only be shot by towers that reach up.
 var flying: bool = false
+## Hits absorbed outright before damage starts landing. Wave affixes hand
+## these out; a volley strips them cheaply, one big shot wastes itself.
+var shield_hits: int = 0
 var slow_immune: bool = false
 var burn_immune: bool = false
 var heal: float = 0.0
@@ -216,6 +219,12 @@ func take_damage(amount: float, pierce_armor: bool = false, source: Node = null)
 		return false
 	if not is_instance_valid(source):
 		source = null
+	if shield_hits > 0:
+		# The shot is spent breaking the shield, whatever it was carrying.
+		shield_hits -= 1
+		hit_flash = 1.0
+		queue_redraw()
+		return false
 	var dealt := amount if pierce_armor else maxf(1.0, amount - armor)
 	dealt = minf(dealt, hp)
 	hp -= dealt
@@ -316,6 +325,9 @@ func _draw() -> void:
 		if armor > 0.0:
 			draw_arc(body_pos, radius * 0.62, 0.0, TAU, 16, Color(1, 1, 1, 0.35), 2.0, true)
 
+	if shield_hits > 0:
+		draw_arc(body_pos, radius + 6.0, 0.0, TAU, 26,
+				Color(0.75, 0.85, 1.0, 0.75), 2.0, true)
 	if slow_timer > 0.0:
 		draw_arc(body_pos, radius + 4.0, 0.0, TAU, 22, Color(0.55, 0.85, 1.0, 0.7), 1.5, true)
 	if burn_timer > 0.0:

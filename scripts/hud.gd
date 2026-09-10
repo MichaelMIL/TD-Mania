@@ -458,8 +458,13 @@ func refresh_wave_preview() -> void:
 
 	var composition: Dictionary = game.wave_composition(upcoming)
 	var boss: bool = composition.has("boss") or composition.has("titan")
-	var heading := _label("BOSS WAVE %d" % upcoming if boss else "Wave %d incoming" % upcoming,
-			13, Color("ef5350") if boss else Color(1, 1, 1, 0.65))
+	var affix: Dictionary = TDData.affix_for(upcoming)
+	var heading_text := "BOSS WAVE %d" % upcoming if boss else "Wave %d incoming" % upcoming
+	if not affix.is_empty():
+		heading_text += "  ·  %s" % str(affix["name"]).to_upper()
+	var heading := _label(heading_text, 13,
+			Color("ef5350") if boss else (Color("ffca28") if not affix.is_empty()
+			else Color(1, 1, 1, 0.65)))
 	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	preview_row.add_child(heading)
 	for kind: String in composition:
@@ -468,6 +473,9 @@ func refresh_wave_preview() -> void:
 	# One line of advice, drawn from the roster's own notes, right-aligned in
 	# whatever space the chips leave.
 	var notes: Array = []
+	# A modifier changes the whole wave, so it outranks any one creep's note.
+	if not affix.is_empty():
+		notes.append("%s: %s" % [affix["name"], affix["note"]])
 	for kind: String in composition:
 		var note := str(TDData.ENEMIES[kind].get("note", ""))
 		if note != "":

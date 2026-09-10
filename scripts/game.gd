@@ -782,6 +782,12 @@ func _build_wave(n: int) -> Array:
 			* TDData.level_stat(level_def, "hp_scale")
 	var speed_mult := (1.0 + 0.01 * float(n - 1)) \
 			* TDData.level_stat(level_def, "speed_scale")
+	# A wave-wide modifier, if this wave has one: the same creeps, but one
+	# thing about all of them is different.
+	var affix := TDData.affix_for(n)
+	if not affix.is_empty():
+		hp_mult *= float(affix["hp_mult"])
+		speed_mult *= float(affix["speed_mult"])
 	var entries: Array = []
 	var t := 0.0
 
@@ -823,6 +829,10 @@ func _build_wave(n: int) -> Array:
 			t += gap
 
 	entries.sort_custom(func(a, b): return float(a["t"]) < float(b["t"]))
+	if not affix.is_empty():
+		for entry: Dictionary in entries:
+			entry["armor"] = float(affix["armor_add"])
+			entry["shield"] = int(affix["shield"])
 	_assign_routes(entries, wave_lanes(n))
 	return entries
 
@@ -880,6 +890,8 @@ func _spawn(kind: String) -> void:
 	var route: int = int(entry.get("route", 0)) % routes.size()
 	e.route_index = route
 	e.setup(kind, float(entry["hp"]), float(entry["spd"]), routes[route])
+	e.armor += float(entry.get("armor", 0.0))
+	e.shield_hits = int(entry.get("shield", 0))
 	e.died.connect(_on_enemy_died)
 	e.leaked.connect(_on_enemy_leaked)
 	e.split.connect(_on_enemy_split)

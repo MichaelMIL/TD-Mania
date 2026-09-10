@@ -210,6 +210,7 @@ func _ready() -> void:
 	_check_knockback_fatigue()
 	_check_save_versioning()
 	_check_wave_rules()
+	_check_wave_affixes()
 	_check_flyers()
 	_check_board_tooltips()
 	_check_objectives()
@@ -2282,6 +2283,73 @@ func _road_length(points: PackedVector2Array) -> float:
 	for i in range(1, points.size()):
 		total += points[i - 1].distance_to(points[i])
 	return total
+
+
+
+
+## Wave affixes: the same creeps, but one thing about all of them is
+## different, and the readout says which.
+func _check_wave_affixes() -> void:
+	var seen: Array = []
+	var affixed := 0
+	for n in range(1, 41):
+		var affix := TDData.affix_for(n)
+		if affix.is_empty():
+			continue
+		affixed += 1
+		if not seen.has(str(affix["id"])):
+			seen.append(str(affix["id"]))
+		if n % 10 == 0:
+			check("boss waves are left unmodified (wave %d)" % n, false)
+	check("early waves are plain", TDData.affix_for(3).is_empty()
+			and TDData.affix_for(6).is_empty())
+	check("affixes appear through a run (%d of 40 waves)" % affixed,
+			affixed >= 6 and affixed <= 16)
+	check("and every one of them gets used (%d)" % seen.size(),
+			seen.size() == TDData.WAVE_AFFIXES.size())
+	var described := true
+	for affix: Dictionary in TDData.WAVE_AFFIXES:
+		if str(affix.get("note", "")).length() < 20 or str(affix["name"]) == "":
+			described = false
+	check("each one explains how to answer it", described)
+
+	# The modifier has to reach the creeps that spawn.
+	var affix_wave := -1
+	for n in range(7, 40):
+		if str(TDData.affix_for(n).get("id", "")) == "armoured":
+			affix_wave = n
+			break
+	check("an armoured wave exists", affix_wave > 0)
+	var plain: Array = game._build_wave(affix_wave - 1)
+	var armoured: Array = game._build_wave(affix_wave)
+	check("its entries carry the extra armour",
+			float(armoured[0].get("armor", 0.0)) > 0.0
+			and float(plain[0].get("armor", 0.0)) == 0.0)
+
+	# Shields absorb a hit outright, whatever it was carrying.
+	var shielded := Enemy.new()
+	shielded.setup("grunt", 1.0, 1.0, game.routes[0])
+	shielded.shield_hits = 1
+	add_child(shielded)
+	var full := shielded.hp
+	shielded.take_damage(9999.0, true)
+	check("a shield eats the first hit entirely",
+			is_equal_approx(shielded.hp, full) and shielded.shield_hits == 0)
+	shielded.take_damage(10.0, true)
+	check("and the next one lands", shielded.hp < full)
+	shielded.queue_free()
+
+	# A swift wave trades health for speed rather than adding both.
+	var swift_wave := -1
+	for n in range(7, 40):
+		if str(TDData.affix_for(n).get("id", "")) == "swift":
+			swift_wave = n
+			break
+	var swift: Array = game._build_wave(swift_wave)
+	var before: Array = game._build_wave(swift_wave - 1)
+	check("a swift wave is faster and frailer than the wave before it",
+			float(swift[0]["spd"]) > float(before[0]["spd"])
+			and float(swift[0]["hp"]) < float(before[0]["hp"]) * 1.1)
 
 
 ## Waves come from a table now. The base curve must be exactly what the old

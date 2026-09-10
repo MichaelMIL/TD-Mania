@@ -133,6 +133,33 @@ static var WAVE_RULES: Array = [
 		"gap": 1.8, "lead": 1.5},
 ]
 
+## Occasional wave-wide modifiers. Cheap variety on top of the rules: the
+## same creeps, but one thing about all of them is different, announced in
+## the readout so it can be answered rather than discovered.
+static var WAVE_AFFIXES: Array = [
+	{"id": "armoured", "name": "Armoured", "armor_add": 6.0, "hp_mult": 1.0,
+		"speed_mult": 1.0, "shield": 0,
+		"note": "Everything is plated. Armour-piercing damage, or nothing."},
+	{"id": "swift", "name": "Swift", "armor_add": 0.0, "hp_mult": 0.8,
+		"speed_mult": 1.3, "shield": 0,
+		"note": "Fast and frail. Slows buy the time your damage needs."},
+	{"id": "shielded", "name": "Shielded", "armor_add": 0.0, "hp_mult": 1.0,
+		"speed_mult": 1.0, "shield": 1,
+		"note": "The first hit on each one is absorbed. Volleys strip shields; big single shots waste on them."},
+	{"id": "hardy", "name": "Hardy", "armor_add": 2.0, "hp_mult": 1.35,
+		"speed_mult": 0.9, "shield": 0,
+		"note": "Slower, but there is a lot more of each one to chew through."},
+]
+
+## Which modifier a wave carries, if any. From wave 7, every third wave,
+## cycling — often enough to plan around, rare enough to notice. Boss waves
+## are left alone.
+static func affix_for(n: int) -> Dictionary:
+	if n % 10 == 0 or n < 7 or n % 3 != 1:
+		return {}
+	return WAVE_AFFIXES[(n / 3) % WAVE_AFFIXES.size()]
+
+
 ## Every tenth wave replaces the rules with an escorted heavy.
 static var BOSS_WAVE: Dictionary = {
 	"escort": {"kind": "grunt", "count": 6, "count_every": 2, "gap": 0.55},

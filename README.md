@@ -461,6 +461,18 @@ Flamethrower) cannot, and neither can their splash — a shell that lands under
 a Drake does nothing to it. The palette says "ground only" for those, so an
 air wave forces a mixed defence rather than more of the same tower.
 
+### Wave affixes
+
+From wave 7, every third wave carries a modifier — the same creeps, but one
+thing about all of them is different: **Armoured** (+6 armour), **Swift**
+(+30% speed, −20% health), **Shielded** (the first hit on each one is
+absorbed outright) or **Hardy** (+35% health, slower). Boss waves are left
+alone.
+
+The readout names it in the heading and explains how to answer it, because
+an affix you discover by losing lives is just an ambush. `TDData.affix_for()`
+decides which wave gets what.
+
 ### Wave tables
 
 Waves are built from data, not code: `TDData.WAVE_RULES` holds one rule per
