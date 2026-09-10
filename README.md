@@ -509,6 +509,26 @@ scripts/art.gd            optional sprite override loader
 scripts/audio.gd          procedural sound bank, voice pool, music (autoloaded)
 ```
 
+### The full-speed smoke test
+
+Every other harness runs at an accelerated `time_scale`, and that is exactly
+how the freed-object crashes slipped past hundreds of assertions: they only
+appear when the frame loop runs at the pace a player sees. `dev/dev_smoke.gd`
+plays several waves — including a boss wave and a wave with flyers, chosen by
+reading the wave table rather than by guessing a number — while a watchdog
+checks *every frame* that nothing on the board has been freed out from under
+a reference, that no creep is dead with health left, and that lives and gold
+never go negative. It builds, upgrades and sells as it goes, since selling a
+tower while its fire is still burning is the case that used to crash.
+
+`--fixed-fps 60` is what makes it honest: each frame advances exactly 1/60 s,
+the delta a real machine produces, while the loop runs as fast as the CPU
+allows — four minutes of game time in about twenty seconds.
+
+A runtime error in Godot is a log line, not a non-zero exit code, so
+`dev/run_checks.sh` runs every harness and fails on `SCRIPT ERROR` and parse
+errors as well as on any `FAIL`.
+
 ### Balance tuning (F2)
 
 Tower numbers are not fixed in code any more. **F2** during a match opens the
@@ -617,6 +637,11 @@ godot --headless --quit-after 30 dev/dev_balance.tscn -- --perf   # targeting co
                                         # "--creeps 500" for a heavier roster
 godot --headless dev/dev_air.tscn       # air-support cycle: launch, attack, land,
                                         # relaunch, against a stationary target
+godot --headless --fixed-fps 60 --quit-after 20000 dev/dev_smoke.tscn
+                                        # plays waves at 1x with a watchdog on
+                                        # every frame (see below)
+dev/run_checks.sh                       # all of the above, failing on any
+                                        # engine error as well as any FAIL
 SHOT_PATH=/tmp/shot.png godot --quit-after 600 dev/dev_shot.tscn -- --panel tuning
                                         # windowed: saves one frame so a UI
                                         # change can be looked at; --fill,

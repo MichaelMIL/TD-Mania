@@ -86,9 +86,16 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
       a *newer* build is read but never overwritten. Reading a slot now also
       clears the previous slot's tech, records, stats and ranks, which used
       to bleed between accounts.
-- [ ] **Full-speed smoke test.** Every harness runs at accelerated
-      `time_scale`; nothing plays a wave at 1× and asserts no runtime errors.
-      That gap is how the freed-object crashes slipped past 292 assertions.
+- [x] **Full-speed smoke test.** *Implemented 2026-09-10.*
+      `dev/dev_smoke.tscn` plays waves at `time_scale` 1 under
+      `--fixed-fps 60`, so every frame advances the delta a real machine
+      produces. A watchdog runs every frame — no freed creep left on the
+      roster, no freed tower on the board, no dead creep with health, no
+      negative lives or gold — while the harness builds, upgrades and sells,
+      takes a boss wave and an air wave (picked by reading the wave table),
+      and round-trips a parked run. `dev/run_checks.sh` runs every harness
+      and fails on engine errors as well as assertions, since a Godot
+      runtime error is a log line, not an exit code.
 - [ ] **Split `scripts/game.gd`** (1,782 lines: state, waves, placement, HUD
       and the service locator in one file). The HUD alone is ~700 lines and
       lifts out cleanly.
