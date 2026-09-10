@@ -389,6 +389,9 @@ static func use_clean_state() -> void:
 	tower_ranks = {}
 	stats = {}
 	runs = {}
+	# Balance overrides are excluded too, so a simulation measures the numbers
+	# in data.gd rather than whatever the developer was last experimenting with.
+	Tuning.use_clean_state()
 
 
 static func reset() -> void:

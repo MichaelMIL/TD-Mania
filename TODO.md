@@ -28,20 +28,25 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
       "Wave N in progress" while a wave runs so the bar never resizes. A
       right-aligned note calls out the counter the wave demands. Bar height
       112 → 134 px, window 902 tall.
-- [ ] **Water Cannon is too strong, and tuning is guesswork.** *Reported
-      2026-09-10.* Balance lives as literals in the `TOWERS` and `LEVELS`
-      tables in `scripts/data.gd`, so trying a number means editing code and
-      relaunching. Build a live tuning screen: pick a tower, scrub its damage,
-      rate, range and cost, see the change in the running match, and save the
-      set as an override file the tables read at startup — per level as well
-      as globally, since a tower can be fair on Easy and absurd on Brutal.
-      Fix the Water Cannon's numbers with it as the first customer.
-- [ ] **Spatial partitioning for targeting.** `find_target()`,
-      `find_targets()` and `_process_menders()` in `scripts/game.gd` scan the
-      whole enemy list every frame, and the mender pass is O(enemies²). With
-      ~150 towers (fill-map cheat) against a late wave that is tens of
-      thousands of distance checks per frame. Bucket enemies into a grid keyed
-      by cell. Measure before/after with `dev/dev_balance.tscn`.
+- [x] **Water Cannon is too strong, and tuning is guesswork.** *Implemented
+      2026-09-10.* **F2** in a match opens a balance editor: every tunable
+      stat of every tower, `−`/`+` live, scoped to all levels or to the level
+      being played, saved to `user://td_mania_tuning.cfg`
+      (`scripts/tuning.gd`, `scripts/tuning_panel.gd`). Stats now flow
+      through `TDData.tower_def()` so edits land on the next frame with no
+      restart. The Wave Cannon was its first customer: knockback 46 -> 32,
+      Storm Surge +16 -> +10 a rank, damage 26 -> 23, cost 190 -> 205, and
+      creeps now build shove-resistance (`push_fatigue` in `enemy.gd`) so
+      stacked cannons can no longer hold a lane still forever.
+- [x] **Spatial partitioning for targeting.** *Implemented 2026-09-10.*
+      Creeps are bucketed into a 128 px grid (`GRID_CELL` in `game.gd`);
+      `find_target`, `find_targets`, `explode`, the mender pass and piercing
+      shots query it through `_buckets()` / `enemies_near()`, with squared
+      distance tests. Rebuilt once a frame (creeps carry
+      `process_priority = -10` so they have all moved first) and patched as
+      they spawn and die. About 2.3x faster targeting on a saturated board,
+      2x on the mender pass, and proven identical to a full scan by 150
+      random queries per targeting mode in `_check_targeting_grid()`.
 
 ## Depth
 
@@ -82,6 +87,20 @@ State at time of writing: 20 maps in 5 areas, 18 towers, 12 enemy kinds,
       sprites is a one-evening visual overhaul.
 - [ ] **Board tooltips.** Hovering a creep to see its armour, immunities and
       speed would teach the roster without a wiki.
+
+## Do last
+
+- [ ] **Cut what the game costs the machine.** *Reported 2026-09-10 — the
+      user's SoC runs hot playing it.* The targeting grid helped the CPU side,
+      but the draw path has not been looked at: every tower, creep, projectile
+      and effect is an individual `_draw()` node redrawn each frame, the water
+      layer animates continuously, `_update_hud()` rebuilds label text every
+      frame, and nothing throttles when the window is idle or the game is
+      paused. Profile first (Godot's monitors: draw calls, objects, physics
+      vs render time), then attack the biggest cost — likely `queue_redraw()`
+      on things that did not change, plus capping the frame rate and dropping
+      to a low-power idle when nothing is moving. Do this after everything
+      else, so it profiles the finished game rather than a moving target.
 
 ## Notes
 

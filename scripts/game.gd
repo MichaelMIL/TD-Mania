@@ -77,6 +77,7 @@ var cursor: Cursor
 var info_hover: Label
 var track_buttons: Array = []
 var palette_cards: Dictionary = {}
+var palette_costs: Dictionary = {}
 var lbl_level: Label
 var lbl_lives: Label
 var lbl_gold: Label
@@ -106,6 +107,7 @@ var surrendered: bool = false
 ## Set when a developer cheat is used; keeps the run out of the record books.
 var cheats_used: bool = false
 var cheats: Cheats
+var tuning_panel: TuningPanel
 var lbl_over: Label
 
 
@@ -140,6 +142,10 @@ func _ready() -> void:
 		cheat_layer.layer = 20
 		add_child(cheat_layer)
 		cheat_layer.add_child(cheats)
+		# The balance editor shares the debug gate: F2 opens it.
+		tuning_panel = TuningPanel.new()
+		tuning_panel.game = self
+		cheat_layer.add_child(tuning_panel)
 	_build_ui()
 	btn_auto.text = "Auto: On" if auto_start else "Auto: Off"
 	btn_auto.modulate = Color("9ce89c") if auto_start else Color.WHITE
@@ -247,7 +253,7 @@ func is_path(c: Vector2i) -> bool:
 func tower_cost(type_id: String) -> int:
 	if Cheats.free_build:
 		return 0
-	return int(round(float(TDData.TOWERS[type_id]["cost"])
+	return int(round(float(TDData.tower_def(type_id)["cost"])
 			* Progress.bonus_mult("build_cost_mult")))
 
 
@@ -259,7 +265,7 @@ func can_place(c: Vector2i, type_id: String = "") -> bool:
 	var kind := terrain_at(c)
 	if type_id == "":
 		return kind == TDData.Terrain.GROUND or kind == TDData.Terrain.WATER
-	return kind == int(TDData.TOWERS[type_id]["terrain"])
+	return kind == int(TDData.tower_def(type_id)["terrain"])
 
 
 ## True if any rock cell would accept a tower — it never should.
@@ -356,6 +362,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_F1:
 				if cheats != null:
 					cheats.toggle()
+			KEY_F2:
+				if tuning_panel != null:
+					tuning_panel.toggle()
 
 
 func _click(c: Vector2i) -> void:
@@ -380,7 +389,7 @@ func _pick_tower(type_id: String) -> void:
 
 
 func _try_place(c: Vector2i) -> void:
-	var d: Dictionary = TDData.TOWERS[placing]
+	var d: Dictionary = TDData.tower_def(placing)
 	var cost := tower_cost(placing)
 	if not Progress.tower_unlocked(placing):
 		fx_text(cell_center(c), "Unlocks at level %d" % Progress.tower_unlock_level(placing),
@@ -863,7 +872,7 @@ func _restore_run(state: Dictionary) -> void:
 		t.target_mode = int(entry.get("mode", 0))
 		t.kills = int(entry.get("kills", 0))
 		t.damage_dealt = float(entry.get("damage", 0.0))
-		t.invested = int(entry.get("invested", TDData.TOWERS[type_id]["cost"]))
+		t.invested = int(entry.get("invested", TDData.tower_def(type_id)["cost"]))
 		layer_towers.add_child(t)
 		occupied[cell] = t
 	break_timer = PREP_TIME
@@ -1366,7 +1375,7 @@ func _build_palette(root: Control) -> void:
 
 
 func _palette_card(type_id: String, index: int) -> Control:
-	var d: Dictionary = TDData.TOWERS[type_id]
+	var d: Dictionary = TDData.tower_def(type_id)
 	var card := PanelContainer.new()
 	card.custom_minimum_size = Vector2(102.0, 88.0)
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -1399,6 +1408,8 @@ func _palette_card(type_id: String, index: int) -> Control:
 	cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cost.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(cost)
+	# Kept so a price retuned with F2 shows up without rebuilding the palette.
+	palette_costs[type_id] = cost
 	if locked:
 		card.tooltip_text = "%s — unlocks at account level %d\n%s" % [d["name"],
 				Progress.tower_unlock_level(type_id), d["desc"]]
@@ -1734,6 +1745,10 @@ func _update_hud() -> void:
 			card.modulate = Color(1, 1, 1, 0.42)
 		else:
 			card.modulate = Color.WHITE
+		if Progress.tower_unlocked(type_id) and palette_costs.has(type_id):
+			var price := "$%d" % tower_cost(type_id)
+			if palette_costs[type_id].text != price:
+				palette_costs[type_id].text = price
 	if selected != null and is_instance_valid(selected):
 		_sync_track_buttons()
 
@@ -1753,7 +1768,7 @@ func _refresh_info(preview: String = "") -> void:
 
 	var type_id: String = preview if preview != "" else placing
 	if type_id != "":
-		var d: Dictionary = TDData.TOWERS[type_id]
+		var d: Dictionary = TDData.tower_def(type_id)
 		var where := "water only" if int(d["terrain"]) == TDData.Terrain.WATER else "dry ground"
 		if not Progress.tower_unlocked(type_id):
 			where = "locked until level %d" % Progress.tower_unlock_level(type_id)

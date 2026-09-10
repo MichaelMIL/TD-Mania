@@ -19,7 +19,7 @@ func _draw() -> void:
 	var cell: Vector2i = game.hover_cell
 	if not game.in_bounds(cell):
 		return
-	var d: Dictionary = TDData.TOWERS[game.placing]
+	var d: Dictionary = TDData.tower_def(game.placing)
 	var pos: Vector2 = game.cell_center(cell)
 	var ok: bool = game.can_place(cell, game.placing) and game.gold >= int(d["cost"])
 	var col: Color = Color("66bb6a") if ok else Color("ef5350")

@@ -206,6 +206,8 @@ func _ready() -> void:
 	await _check_routes()
 	_check_targeting()
 	_check_targeting_grid()
+	_check_tuning()
+	_check_knockback_fatigue()
 	_check_enemy_kinds()
 	_check_cheats()
 	_check_audio()
@@ -1488,6 +1490,123 @@ func _check_targeting() -> void:
 	game.invalidate_targeting_grid()
 
 
+
+
+
+
+## Balance overrides: the numbers the tuning panel writes must reach the game
+## without a restart, layer level over global, and never leak into a harness.
+func _check_tuning() -> void:
+	Tuning.use_clean_state()
+	var level: int = int(game.level_def["id"])
+	var base: float = float(TDData.TOWERS["gun"]["damage"])
+	check("a stock tower reads the table", is_equal_approx(
+			float(TDData.tower_def("gun")["damage"]), base))
+
+	Tuning.set_value("gun", "damage", base + 10.0, -1)
+	check("a global override reaches the tower def", is_equal_approx(
+			float(TDData.tower_def("gun")["damage"]), base + 10.0))
+	# The cache is keyed on the override version, so this must not go stale.
+	Tuning.set_value("gun", "damage", base + 20.0, -1)
+	check("changing it again is picked up immediately", is_equal_approx(
+			float(TDData.tower_def("gun")["damage"]), base + 20.0))
+
+	Tuning.set_value("gun", "damage", base + 99.0, level)
+	check("a level override beats the global one", is_equal_approx(
+			float(TDData.tower_def("gun")["damage"]), base + 99.0))
+	var other := level + 1 if level + 1 < TDData.LEVELS.size() else level - 1
+	var was := TDData.selected_level
+	TDData.selected_level = other
+	check("and it applies to that level only", is_equal_approx(
+			float(TDData.tower_def("gun")["damage"]), base + 20.0))
+	TDData.selected_level = was
+
+	Tuning.clear_value("gun", "damage", level)
+	check("clearing a level override falls back to the global", is_equal_approx(
+			float(TDData.tower_def("gun")["damage"]), base + 20.0))
+	Tuning.clear_tower("gun", -1)
+	check("clearing the tower falls back to the table", is_equal_approx(
+			float(TDData.tower_def("gun")["damage"]), base))
+
+	# Costs are ints in the table and must stay ints, or prices print as 205.0.
+	Tuning.set_value("gun", "cost", 77.0, -1)
+	check("a tuned cost stays a whole number",
+			typeof(TDData.tower_def("gun")["cost"]) == TYPE_INT
+			and int(TDData.tower_def("gun")["cost"]) == 77)
+	check("the game charges the tuned price", game.tower_cost("gun") == 77)
+	Tuning.clear_all()
+	check("reset puts every number back", is_equal_approx(
+			float(TDData.tower_def("gun")["damage"]), base)
+			and game.tower_cost("gun") == int(TDData.TOWERS["gun"]["cost"]))
+
+	# A live tower must feel the change on the next frame, not on rebuild.
+	var live := Tower.new()
+	live.game = game
+	live.setup("gun", Vector2i.ZERO)
+	var before := live.stat("damage")
+	Tuning.set_value("gun", "damage", base * 2.0, -1)
+	check("a tower already on the board picks the change up",
+			live.stat("damage") > before * 1.9)
+	Tuning.clear_all()
+	live.free()
+
+	# Rows are per tower: only stats it actually defines.
+	var gun_keys: Array = []
+	for row: Dictionary in Tuning.rows_for("gun"):
+		gun_keys.append(str(row["key"]))
+	var wave_keys: Array = []
+	for row: Dictionary in Tuning.rows_for("wavegun"):
+		wave_keys.append(str(row["key"]))
+	check("every tower exposes its core numbers", gun_keys.has("damage")
+			and gun_keys.has("rate") and gun_keys.has("range") and gun_keys.has("cost"))
+	check("knockback shows for the Wave Cannon and not the Gunner",
+			wave_keys.has("knockback") and not gun_keys.has("knockback"))
+
+	# The panel itself: it must drive Tuning, not its own copy of the numbers.
+	var panel := TuningPanel.new()
+	panel.game = game
+	add_child(panel)
+	panel._select_tower("cannon")
+	var cannon_base: float = float(TDData.TOWERS["cannon"]["damage"])
+	panel._nudge("damage", 1.0)
+	check("a click on the panel moves the real number",
+			Tuning.value_of("cannon", "damage", -1) > cannon_base)
+	panel._toggle_scope()
+	panel._nudge("damage", -1.0)
+	check("with the scope flipped it writes the level layer",
+			Tuning.level_values.has(level))
+	panel._reset_all()
+	check("reset all clears both layers", not Tuning.has_overrides())
+	check("a harness never writes the tuning file", not Tuning.save_file())
+	remove_child(panel)
+	panel.queue_free()
+	Tuning.clear_all()
+
+
+## Shoving the same creep over and over has to lose its grip, or a pair of
+## Wave Cannons holds a lane still forever.
+func _check_knockback_fatigue() -> void:
+	var creep := Enemy.new()
+	creep.setup("grunt", 1.0, 1.0, game.routes[0])
+	add_child(creep)
+	for i in 40:
+		creep._process(0.05)
+	var start := creep.progress
+	creep.push_back(60.0)
+	var first := start - creep.progress
+	var second_start := creep.progress
+	creep.push_back(60.0)
+	var second := second_start - creep.progress
+	check("the first shove moves the creep", first > 1.0)
+	check("the second shove in a row moves it less", second < first * 0.8)
+	# Left alone it recovers.
+	for i in 60:
+		creep._process(0.1)
+	var third_start := creep.progress
+	creep.push_back(60.0)
+	check("after a breather a shove lands in full",
+			third_start - creep.progress > second * 1.4)
+	creep.queue_free()
 
 
 ## A full scan of the roster, kept as the reference the bucketed grid must

@@ -420,6 +420,27 @@ scripts/art.gd            optional sprite override loader
 scripts/audio.gd          procedural sound bank, voice pool, music (autoloaded)
 ```
 
+### Balance tuning (F2)
+
+Tower numbers are not fixed in code any more. **F2** during a match opens the
+balance editor: pick a tower on the left, nudge damage, fire rate, range,
+cost, splash, slow, knockback and the rest with `−` / `+`, and the change
+takes effect immediately — towers re-read their stats every frame and the
+palette reprices itself.
+
+The **Scope** button decides where a change is written: *all levels* or *this
+level only*, so a tower that is fair on Easy and absurd on Brutal can be
+pegged back where it actually misbehaves. Values that differ from the table
+are shown in orange with the percentage change, and every row has its own
+`reset`. **Save** writes `user://td_mania_tuning.cfg`; **Revert** reloads it;
+**Reset all** empties both layers.
+
+Overrides live in that one file, never in a save slot, and deleting it
+restores the numbers in `data.gd`. The dev harnesses call
+`Tuning.use_clean_state()`, so a simulation always measures stock balance.
+Anything that reads a tower stat must go through `TDData.tower_def(id)` — the
+raw `TDData.TOWERS` table bypasses the editor.
+
 ### Targeting grid
 
 Creeps are bucketed into a 128 px grid (`GRID_CELL` in `scripts/game.gd`) so a
@@ -507,4 +528,8 @@ godot --headless --quit-after 30 dev/dev_balance.tscn -- --perf   # targeting co
                                         # "--creeps 500" for a heavier roster
 godot --headless dev/dev_air.tscn       # air-support cycle: launch, attack, land,
                                         # relaunch, against a stationary target
+SHOT_PATH=/tmp/shot.png godot --quit-after 600 dev/dev_shot.tscn -- --panel tuning
+                                        # windowed: saves one frame so a UI
+                                        # change can be looked at; --fill and
+                                        # --wave set the board up first
 ```

@@ -33,6 +33,8 @@ var burn_timer: float = 0.0
 ## Tower that lit the fire, so burn ticks are credited to it.
 var burn_source: Node = null
 var hit_flash: float = 0.0
+## How shove-resistant this creep currently is; see push_back().
+var push_fatigue: float = 0.0
 var slow_immune: bool = false
 var burn_immune: bool = false
 var heal: float = 0.0
@@ -100,6 +102,8 @@ func _process(delta: float) -> void:
 	if hit_flash > 0.0:
 		hit_flash = maxf(0.0, hit_flash - delta * 4.0)
 		queue_redraw()
+	if push_fatigue > 0.0:
+		push_fatigue = maxf(0.0, push_fatigue - delta * PUSH_FATIGUE_DECAY)
 	if burn_timer > 0.0:
 		burn_timer -= delta
 		# The tower that lit the fire may have been sold since. A freed object
@@ -144,10 +148,17 @@ func _process(delta: float) -> void:
 
 
 ## Shoves the creep back down its own road. Used by the Wave Cannon.
+## Repeated shoves lose their grip: without this a pair of Wave Cannons can
+## hold a lane at a standstill forever. Fatigue decays in `_process`.
+const PUSH_FATIGUE_MAX := 4.0
+const PUSH_FATIGUE_DECAY := 1.2
+
+
 func push_back(distance: float) -> void:
 	if dead or path.size() < 2:
 		return
-	var remaining := distance
+	var remaining := distance / (1.0 + push_fatigue)
+	push_fatigue = minf(PUSH_FATIGUE_MAX, push_fatigue + 1.0)
 	while remaining > 0.0:
 		var anchor: Vector2 = path[seg]
 		var gap := walk_pos.distance_to(anchor)

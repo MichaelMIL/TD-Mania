@@ -32,6 +32,12 @@ static var TARGET_HINTS: Array = [
 ## Which level the menu handed to the game scene. Static so it survives the
 ## scene change without an autoload.
 static var selected_level: int = 0
+
+## Tuned tower definitions, rebuilt whenever the overrides or the level
+## change. Towers read their numbers every frame, so this is cached rather
+## than merged on each lookup.
+static var _tuned_defs: Dictionary = {}
+static var _tuned_stamp: String = ""
 ## Set by the menu when the player picks Continue rather than a fresh run.
 static var resume_run: bool = false
 
@@ -689,6 +695,30 @@ static var LEVELS: Array = [
 ## chosen to suit that tower, and a track's last rank may also unlock a named
 ## capstone effect. Track mod keys combine by suffix: `_mult` multiplies per
 ## rank, `_add` sums per rank, and bare keys are set once.
+## A tower's numbers with any tuning overrides applied — global ones first,
+## then this level's. Everything that reads a tower stat should come through
+## here rather than indexing TOWERS directly, or the tuning panel (F2) will
+## not reach it.
+static func tower_def(id: String) -> Dictionary:
+	var stamp := "%d/%d" % [Tuning.version, selected_level]
+	if stamp != _tuned_stamp:
+		_tuned_stamp = stamp
+		_tuned_defs = {}
+	if _tuned_defs.has(id):
+		return _tuned_defs[id]
+	var base: Dictionary = TOWERS[id]
+	var over := Tuning.effective(id, selected_level)
+	var out: Dictionary = base
+	if not over.is_empty():
+		out = base.duplicate(true)
+		for key: String in over:
+			# Ints in the table stay ints, or costs turn into "$115.0".
+			out[key] = int(round(float(over[key]))) if typeof(base.get(key)) == TYPE_INT \
+					else float(over[key])
+	_tuned_defs[id] = out
+	return out
+
+
 static var TOWERS: Dictionary = {
 	"gun": {
 		"name": "Gunner", "short": "Gunner", "cost": 60, "color": Color("4fc3f7"),
@@ -1016,16 +1046,16 @@ static var TOWERS: Dictionary = {
 		],
 	},
 	"wavegun": {
-		"name": "Wave Cannon", "short": "Wave Gun", "cost": 190, "color": Color("4fc3f7"),
-		"range": 175.0, "rate": 0.5, "damage": 26.0, "proj_speed": 420.0,
-		"splash": 52.0, "slow": 0.25, "slow_dur": 1.0, "knockback": 46.0,
+		"name": "Wave Cannon", "short": "Wave Gun", "cost": 205, "color": Color("4fc3f7"),
+		"range": 175.0, "rate": 0.5, "damage": 23.0, "proj_speed": 420.0,
+		"splash": 52.0, "slow": 0.25, "slow_dur": 1.0, "knockback": 32.0,
 		"beam": false, "pierce_armor": false,
 		"terrain": Terrain.WATER, "air": false,
 		"unlock_level": 14,
 		"desc": "WATER ONLY. Breaks a wave over the road that shoves everything back down it.",
 		"tracks": [
 			{"key": "push", "name": "Storm Surge", "max": 4, "cost_frac": 0.5,
-				"mods": {"knockback_add": 16.0},
+				"mods": {"knockback_add": 10.0},
 				"capstone": {"name": "Riptide Wall", "desc": "The surge also drags them to a crawl.",
 					"mods": {"slow_set": 0.6}}},
 			{"key": "dmg", "name": "Pressure Charge", "max": 3, "cost_frac": 0.55,

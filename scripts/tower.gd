@@ -61,7 +61,7 @@ func setup(t: String, c: Vector2i) -> void:
 
 
 func def() -> Dictionary:
-	return TDData.TOWERS[type_id]
+	return TDData.tower_def(type_id)
 
 
 func mods() -> Dictionary:
