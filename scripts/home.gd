@@ -17,6 +17,8 @@ var status: Label
 
 func _ready() -> void:
 	Progress.load_state()
+	# Out of any challenge: the next match is whatever is picked from here.
+	TDData.active_challenge = {}
 	Audio.set_volumes(Progress.volume("sfx"), Progress.volume("music"))
 	Audio.play_music(true)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -103,6 +105,17 @@ func _build() -> void:
 	play.pressed.connect(_go.bind(LEVELS_SCENE))
 	buttons.add_child(play)
 
+	# The daily is the reason to open the game today, so the button says
+	# whether it is still waiting.
+	var daily_done := Progress.daily_done(Challenges.today())
+	var challenges := _menu_button("Challenges  ·  daily done ✓" if daily_done
+			else "Challenges  ·  today's daily is waiting",
+			"Fixed challenges with their own rules, and a new one every day")
+	if not daily_done:
+		challenges.add_theme_color_override("font_color", Color("e1bee7"))
+	challenges.pressed.connect(_go.bind(Challenges.SCENE))
+	buttons.add_child(challenges)
+
 	var tech := _menu_button("Tech Tree", "Spend coins on permanent upgrades")
 	tech.pressed.connect(_go.bind("res://tech.tscn"))
 	buttons.add_child(tech)
@@ -119,10 +132,6 @@ func _build() -> void:
 			"Switch to another save", 15)
 	slot.pressed.connect(_go.bind(SLOTS_SCENE))
 	buttons.add_child(slot)
-
-	var quit := _menu_button("Quit", "Close the game", 15)
-	quit.pressed.connect(func(): get_tree().quit())
-	buttons.add_child(quit)
 
 	status = _label("Escape closes a screen. Everything here is saved as you go.",
 			12, Color(1, 1, 1, 0.35))

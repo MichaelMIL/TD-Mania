@@ -173,6 +173,33 @@ func _check_new_towers() -> void:
 	check("torpedo is water only",
 			int(TDData.TOWERS["torpedo"]["terrain"]) == TDData.Terrain.WATER)
 	check("torpedo pierces a line", _fresh("torpedo").pierce_count() >= 2)
+
+	# The three water towers share a terrain, so each has to be worth
+	# building for a different reason. They used to be two splash-and-slow
+	# towers and a sniper.
+	var tide := _fresh("tide")
+	var surf := _fresh("wavegun")
+	var fish := _fresh("torpedo")
+	check("only the Tide Caller can reach a flyer",
+			bool(TDData.TOWERS["tide"].get("hits_air", false))
+			and not bool(TDData.TOWERS["wavegun"].get("hits_air", false))
+			and not bool(TDData.TOWERS["torpedo"].get("hits_air", false)))
+	check("the Tide Caller is the one that slows",
+			tide.slow_factor() > 0.3 and surf.slow_factor() == 0.0
+			and fish.slow_factor() == 0.0)
+	check("the Wave Cannon is the one that shoves",
+			surf.knockback() > 0.0 and tide.knockback() == 0.0
+			and fish.knockback() == 0.0)
+	check("the Torpedo Battery is the one that reaches",
+			fish.stat("range") > tide.stat("range")
+			and fish.stat("range") > surf.stat("range"))
+	check("and hits hardest for a single shot",
+			fish.stat("damage") > tide.stat("damage")
+			and fish.stat("damage") > surf.stat("damage"))
+	check("the chiller is not also the damage dealer",
+			tide.stat("damage") < surf.stat("damage"))
+	check("and only the two of them splash",
+			tide.splash() > 0.0 and surf.splash() > 0.0 and fish.splash() == 0.0)
 	var post := _fresh("command")
 	check("command post is support", post.is_support() and post.stat("damage") == 0.0)
 	check("command post buffs damage and rate", post.aura_damage() > 0.0 and post.aura_rate() > 0.0)

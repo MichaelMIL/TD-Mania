@@ -395,11 +395,26 @@ func _check_knockback_fatigue() -> void:
 	var start := creep.progress
 	creep.push_back(60.0)
 	var first := start - creep.progress
+	check("the first shove moves the creep", first > 1.0)
+
+	# A second Wave Cannon landing in the same instant adds damage, not
+	# distance: for a moment the creep cannot be shoved at all. This is what
+	# stops a pair of them pinning a lane.
+	var pinned := creep.progress
+	creep.push_back(60.0)
+	creep.push_back(60.0)
+	check("a shove inside the lock does nothing at all", creep.progress == pinned)
+	check("and the creep says it is still locked", creep.push_lock > 0.0)
+
+	# Once the lock lapses a shove lands again, though fatigue has it short.
+	for i in int(ceil(Enemy.PUSH_IMMUNE / 0.05)) + 1:
+		creep._process(0.05)
 	var second_start := creep.progress
 	creep.push_back(60.0)
 	var second := second_start - creep.progress
-	check("the first shove moves the creep", first > 1.0)
-	check("the second shove in a row moves it less", second < first * 0.8)
+	check("after the lock lapses a shove lands again", second > 0.0)
+	check("but a shove in quick succession is a shorter one", second < first * 0.8)
+
 	# Left alone it recovers.
 	for i in 60:
 		creep._process(0.1)
@@ -695,6 +710,14 @@ func _check_board_tooltips() -> void:
 	var flyer := Enemy.new()
 	flyer.setup("drake", 1.0, 1.0, game.routes[0])
 	check("a flyer says it flies", str(game.hud.describe_enemy(flyer)).contains("flying"))
+	# Draw order. The enemy layer sits under the tower layer, which is right
+	# for something walking between towers and wrong for something above them.
+	check("a flyer is drawn above the towers",
+			game.layer_enemies.z_index + flyer.z_index > game.layer_towers.z_index)
+	check("a walker is not", game.layer_enemies.z_index + mender.z_index
+			<= game.layer_towers.z_index)
+	check("and a shot is drawn above the flyer it hits",
+			game.layer_proj.z_index > game.layer_enemies.z_index + flyer.z_index)
 	var thief := Enemy.new()
 	thief.setup("thief", 1.0, 1.0, game.routes[0])
 	check("and a thief says what it takes",

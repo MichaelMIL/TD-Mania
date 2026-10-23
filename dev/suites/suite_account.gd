@@ -12,6 +12,8 @@ func run() -> void:
 	_check_slots()
 	_check_save_versioning()
 	_check_run_seed()
+	_check_slots_are_separate()
+	_check_slot_round_trip()
 	_check_save_safety()
 	_check_tutorial()
 	_check_respec()
@@ -42,10 +44,33 @@ func _check_progression() -> void:
 		if need <= 1:
 			starters += 1
 		top_unlock = maxi(top_unlock, need)
-		if need < 1 or need > 20:
+		if need < 1 or need > Progress.MAX_LEVEL:
 			ok_range = false
 	check("at least two towers are available from the start", starters >= 2)
 	check("unlock levels are sane", ok_range)
+
+	# Pacing. The game is eighteen towers, thirty maps and a tech tree; the
+	# level curve is the only thing spreading them over a campaign, and it
+	# used to hand the lot over in about twenty runs. These hold that shape
+	# without pinning the exact numbers. dev/dev_progress.tscn measures it
+	# for real.
+	var last_map := 1
+	for m: Dictionary in TDData.LEVELS:
+		last_map = maxi(last_map, TDData.level_unlock(m))
+	check("towers keep arriving deep into the ladder (last at %d)" % top_unlock,
+			top_unlock >= Progress.MAX_LEVEL / 2)
+	check("and so do maps (last at %d)" % last_map, last_map >= Progress.MAX_LEVEL / 2)
+	# A run pays on the order of a couple of thousand XP. Once the opening
+	# levels are behind you, one run must be worth about one level rather
+	# than vaulting several at once — that is what made every unlock arrive
+	# at the same time.
+	var big_run := 3000
+	var mid_jump := Progress.level_for_xp(Progress.xp_for_level(10) + big_run) - 10
+	var late_jump := Progress.level_for_xp(Progress.xp_for_level(25) + big_run) - 25
+	check("a big run is worth about a level by mid-ladder (%d)" % mid_jump, mid_jump <= 1)
+	check("and still is near the top (%d)" % late_jump, late_jump <= 1)
+	# Early levels still have to land quickly enough to feel like progress.
+	check("the first level is within a run or two", Progress.xp_for_level(2) <= 2000)
 	check("locked towers really are locked at level 1",
 			not Progress.tower_unlocked("command") and Progress.tower_unlocked("gun"))
 
@@ -65,6 +90,28 @@ func _check_progression() -> void:
 	var upcoming: Dictionary = Progress.next_unlock()
 	check("the menu can name the next unlock",
 			not upcoming.is_empty() and int(upcoming["level"]) > 1)
+
+	# A save from before the curve was stretched keeps the level it had, so
+	# rebalancing never repossesses a tower the account already earned.
+	var v7 := ConfigFile.new()
+	v7.set_value("meta", "version", 7)
+	v7.set_value("progress", "xp", Progress._legacy_xp_for_level(22))
+	Progress.migrate_config(v7, 7)
+	check("an older save keeps its level on the new curve",
+			Progress.level_for_xp(int(v7.get_value("progress", "xp", 0))) == 22)
+	# Whatever it held, the migration only ever adds: an account cannot come
+	# out of it poorer than it went in.
+	var kept := true
+	for l in [1, 5, 17, 30, Progress.MAX_LEVEL]:
+		var before := Progress._legacy_xp_for_level(l)
+		var cfg7 := ConfigFile.new()
+		cfg7.set_value("meta", "version", 7)
+		cfg7.set_value("progress", "xp", before)
+		Progress.migrate_config(cfg7, 7)
+		var after := int(cfg7.get_value("progress", "xp", 0))
+		if after < before or Progress.level_for_xp(after) != l:
+			kept = false
+	check("every old level survives the stretch, and no XP is taken away", kept)
 
 	# A locked tower cannot be built even with plenty of gold.
 	var spot := Vector2i(-99, -99)
@@ -142,6 +189,13 @@ func _check_saved_runs() -> void:
 	placed.kills = 9
 	placed.cycle_target_mode()
 	var placed_mode: int = placed.target_mode
+	# Upgrades bought this run must survive parking it.
+	placed.ranks[0] = 2
+	placed.ranks[1] = 1
+	placed.invested += 250
+	var placed_ranks: Array = placed.ranks.duplicate()
+	var placed_invested: int = placed.invested
+	var placed_damage: float = placed.stat("damage")
 	probe.wave = 4
 	probe.lives = 12
 	probe.score = 750
@@ -187,6 +241,10 @@ func _check_saved_runs() -> void:
 	check("a rebuilt tower keeps its type and tally",
 			back.type_id == "cannon" and back.kills == 9)
 	check("a rebuilt tower keeps its targeting", back.target_mode == placed_mode)
+	check("a rebuilt tower keeps its upgrades", back.ranks == placed_ranks)
+	check("and what they did", is_equal_approx(back.stat("damage"), placed_damage))
+	check("and what was spent on them, for its sale price",
+			back.invested == placed_invested)
 	check("continuing consumes the resume flag", not TDData.resume_run)
 	var resumed_gold: int = resumed.gold
 	resumed.break_timer = resumed.BREAK_TIME
@@ -452,6 +510,24 @@ func _check_save_versioning() -> void:
 			typeof(filled["tower_kills"]) == TYPE_DICTIONARY
 			and typeof(filled["kills"]) == TYPE_INT)
 
+	# A version 5 save: parked towers without their ranks. The gold spent
+	# upgrading them comes back, since the ranks themselves are gone.
+	var v5 := ConfigFile.new()
+	v5.set_value("meta", "version", 5)
+	var cannon_cost := int(TDData.tower_def("cannon")["cost"])
+	v5.set_value("runs", "verdant", {"wave": 6, "gold": 100, "towers": [
+		{"x": 3, "y": 2, "type": "cannon", "invested": cannon_cost + 180},
+		{"x": 4, "y": 2, "type": "cannon", "invested": cannon_cost}]})
+	Progress.migrate_config(v5, 5)
+	var refunded: Dictionary = v5.get_value("runs", "verdant", {})
+	check("a version 5 run gets back what its towers' lost upgrades cost",
+			int(refunded["gold"]) == 100 + 180)
+	check("and its towers are worth their plain price again",
+			int(refunded["towers"][0]["invested"]) == cannon_cost
+			and int(refunded["towers"][1]["invested"]) == cannon_cost)
+	check("and say they have no ranks rather than leaving it unsaid",
+			(refunded["towers"][0] as Dictionary).has("ranks"))
+
 	# A save from a future build must be read, never rewritten.
 	var future := ConfigFile.new()
 	future.set_value("meta", "version", Progress.SAVE_VERSION + 5)
@@ -484,6 +560,190 @@ func _check_save_versioning() -> void:
 			not Progress.bests.has("verdant") and int(Progress.bests.get("riverfork", 0)) == 9)
 	check("while reading the new slot's own numbers", Progress.xp == 120)
 	Progress.use_clean_state()
+
+## Each slot is its own account. The tables are static, so anything a reset
+## forgets to clear is carried into the next slot and written there by its
+## first save — which is how the tech tree came to look shared.
+func _check_slots_are_separate() -> void:
+	var path := "user://td_mania_slot_test.cfg"
+	for leftover: String in [path, path + ".bak", path + ".tmp"]:
+		if FileAccess.file_exists(leftover):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(leftover))
+
+	# An account with something in every table.
+	Progress.blank_tables()
+	Progress.xp = 50000
+	Progress.coins = 900
+	Progress.ranks["munitions"] = 2
+	Progress.tower_ranks["gun"] = [3, 2, 1]
+	Progress.bests["verdant"] = 19
+	Progress.stars["verdant"] = 7
+	Progress.cleared["verdant"] = 25
+	Progress.stats["runs"] = 40
+	Progress.runs["verdant"] = {"wave": 6}
+	Progress.challenges["gun_line"] = {"best": 15, "done": true, "goal": 15}
+	Progress.daily = {"last": "2026-10-22", "streak": 4}
+	Progress.keys["pause"] = KEY_K
+
+	# Switching to a slot whose file does not exist yet.
+	Progress.load_slot_file(path)
+	var leaked: Array = []
+	for pair: Array in [["tech ranks", Progress.ranks.is_empty()],
+			["tower ranks", Progress.tower_ranks.is_empty()],
+			["best waves", Progress.bests.is_empty()],
+			["stars", Progress.stars.is_empty()],
+			["cleared maps", Progress.cleared.is_empty()],
+			["lifetime stats", Progress.stats.is_empty()],
+			["parked runs", Progress.runs.is_empty()],
+			["challenges", Progress.challenges.is_empty()],
+			["the daily", Progress.daily.is_empty()],
+			["key binds", Progress.keys.is_empty()],
+			["XP", Progress.xp == 0], ["coins", Progress.coins == 0]]:
+		if not bool(pair[1]):
+			leaked.append(str(pair[0]))
+	check("an empty slot starts empty, carrying nothing over (%s)" % ", ".join(leaked),
+			leaked.is_empty())
+	check("and its options are the defaults, not the last account's",
+			is_equal_approx(Progress.volume("sfx"), 0.8) and Progress.frame_cap() == 60)
+
+	# And a slot that does have a file gets that file, not what was in memory.
+	Progress.tower_ranks["gun"] = [3, 2, 1]
+	Progress.coins = 777
+	var saved := ConfigFile.new()
+	saved.set_value("meta", "version", Progress.SAVE_VERSION)
+	saved.set_value("progress", "xp", 1234)
+	saved.set_value("progress", "coins", 5)
+	Progress.write_config(saved, path)
+	Progress.load_slot_file(path)
+	check("a slot with a file gets exactly what is in it",
+			Progress.xp == 1234 and Progress.coins == 5
+			and Progress.tower_ranks.is_empty())
+
+	# Erasing a slot must take its backup with it, or the next read brings
+	# the erased account straight back.
+	Progress.write_config(saved, path)
+	check("a save keeps a backup", FileAccess.file_exists(path + ".bak"))
+	for leftover: String in [path, path + ".bak"]:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(leftover))
+	Progress.load_slot_file(path)
+	check("an erased slot stays erased", Progress.xp == 0 and Progress.coins == 0)
+	for leftover: String in [path, path + ".bak", path + ".tmp"]:
+		if FileAccess.file_exists(leftover):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(leftover))
+	Progress.use_clean_state()
+
+
+## The whole slot round trip, against real files: fill one slot, switch to
+## another, come back, and check nothing crossed over. Reading the code was
+## not enough to find this the first time, so this writes and reads for
+## real — under a scratch prefix, never the player's own saves.
+func _check_slot_round_trip() -> void:
+	var was_prefix: String = Progress.slot_prefix
+	var was_read_only: bool = Progress.read_only
+	Progress.slot_prefix = "user://td_mania_roundtrip_"
+	Progress.read_only = false
+	var paths: Array = []
+	for i in 3:
+		paths.append(Progress.slot_path(i))
+		paths.append(Progress.slot_path(i) + ".bak")
+		paths.append(Progress.slot_path(i) + ".tmp")
+	for p: String in paths:
+		if FileAccess.file_exists(p):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(p))
+
+	# Slot 1 becomes a real account.
+	Progress.use_slot(0)
+	Progress.xp = 40000
+	Progress.coins = 650
+	Progress.ranks["munitions"] = 3
+	Progress.tower_ranks["gun"] = [4, 3, 2]
+	Progress.bests["verdant"] = 21
+	Progress.stars["verdant"] = 5
+	Progress.cleared["verdant"] = 25
+	Progress.stats["runs"] = 17
+	Progress.challenges["gun_line"] = {"best": 16, "done": true, "goal": 15}
+	Progress.daily = {"last": "2026-10-23", "streak": 3, "count": 3}
+	Progress.runs["verdant"] = {"key": "verdant", "wave": 9}
+	Progress.save_state()
+
+	# Slot 2 has never been played.
+	Progress.use_slot(1)
+	var crossed: Array = []
+	for pair: Array in [["XP", Progress.xp == 0], ["coins", Progress.coins == 0],
+			["tech ranks", Progress.ranks.is_empty()],
+			["tower ranks", Progress.tower_ranks.is_empty()],
+			["best waves", Progress.bests.is_empty()],
+			["stars", Progress.stars.is_empty()],
+			["cleared maps", Progress.cleared.is_empty()],
+			["lifetime stats", Progress.stats.is_empty()],
+			["challenges", Progress.challenges.is_empty()],
+			["the daily", Progress.daily.is_empty()],
+			["parked runs", Progress.runs.is_empty()]]:
+		if not bool(pair[1]):
+			crossed.append(str(pair[0]))
+	check("a fresh slot sees none of the last one (%s)" % ", ".join(crossed),
+			crossed.is_empty())
+	check("and the slot picker agrees it is empty",
+			not bool(Progress.slot_summary(1)["used"]))
+
+	# Play it a little and save, which is where the leak used to be written.
+	Progress.xp = 1200
+	Progress.coins = 30
+	Progress.tower_ranks["cannon"] = [1, 0, 0, 0]
+	Progress.save_state()
+	var second := Progress.slot_summary(1)
+	check("slot 2 saves only its own account",
+			int(second["xp"]) == 1200 and int(second["coins"]) == 30
+			and int(second["tech"]) == 0)
+
+	# Back to slot 1: everything it had, and nothing slot 2 did.
+	Progress.use_slot(0)
+	check("slot 1 is exactly as it was left",
+			Progress.xp == 40000 and Progress.coins == 650
+			and int(Progress.ranks.get("munitions", 0)) == 3
+			and Array(Progress.tower_ranks.get("gun", [])) == [4, 3, 2]
+			and int(Progress.bests.get("verdant", 0)) == 21
+			and int(Progress.stats.get("runs", 0)) == 17
+			and Progress.challenges.has("gun_line")
+			and int(Progress.daily.get("streak", 0)) == 3)
+	check("and never picked up what slot 2 did",
+			not Progress.tower_ranks.has("cannon"))
+
+	# A third slot, still untouched, must be empty from either direction.
+	Progress.use_slot(2)
+	check("a slot nobody has opened is empty",
+			Progress.xp == 0 and Progress.ranks.is_empty()
+			and Progress.tower_ranks.is_empty() and Progress.runs.is_empty())
+
+	# Erasing takes the backup with it.
+	Progress.use_slot(0)
+	Progress.save_state()
+	Progress.erase_slot(0)
+	Progress.use_slot(0)
+	check("an erased slot does not come back from its backup",
+			Progress.xp == 0 and Progress.ranks.is_empty())
+
+	# The picker and the loader must agree about what a slot holds. If only
+	# the backup survives, the slot is not empty — saying otherwise is how a
+	# "new game" turned into somebody else's account.
+	Progress.use_slot(1)
+	Progress.xp = 7777
+	Progress.save_state()
+	Progress.save_state()
+	check("saving twice leaves a backup", FileAccess.file_exists(Progress.slot_path(1) + ".bak"))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Progress.slot_path(1)))
+	var only_backup := Progress.slot_summary(1)
+	Progress.use_slot(1)
+	check("a slot with only a backup is not called empty",
+			bool(only_backup["used"]) == (Progress.xp > 0))
+
+	for p: String in paths:
+		if FileAccess.file_exists(p):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(p))
+	Progress.slot_prefix = was_prefix
+	Progress.read_only = was_read_only
+	Progress.use_clean_state()
+
 
 ## Saves survive being interrupted: a write lands whole or not at all, and
 ## the copy it replaced is kept.

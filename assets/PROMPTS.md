@@ -356,3 +356,252 @@ generic file: `tile_grass_<id>.png`, `tile_path_<id>.png`,
 `twingates`, `junction`, `ruins`, `delta`, `comb`, `pipeworks`,
 `convergence`), and each level's `palette` entry gives the colours its
 vector art currently uses — a good brief for the sprite.
+
+---
+
+## App icon (1024x1024, NO transparency)
+
+The icon the phone, Mac and web tab show. `assets/icon.png` ships with a
+plain placeholder — a grey tower on a gold ring — so the iOS and Android
+exports have something to sign. Replace it in place; the exports read it
+on the next build, and Godot cuts every smaller size from it.
+
+**`icon.png`** (1024x1024, opaque square, no rounded corners — the OS rounds
+them)
+> App icon for a tower defense game called TD Mania. A single stout stone
+> watchtower with crenellations seen slightly from above, one glowing gold
+> window, standing on a small green hill with a dirt path curving past it,
+> inside a thin gold range ring. Deep navy night background filling the whole
+> square. Flat vector game-art style, bold silhouette readable at 32 pixels,
+> no text, no transparency.
+
+---
+
+## Upgrade icons (256x256, transparent outside the badge)
+
+One per upgrade track, shown on the track's button beside its name and price
+(`scripts/upgrade_icon.gd`). Until a file exists the game draws a badge in the
+tower's colour with a symbol for what the upgrade does, so these can arrive one
+at a time. The image is drawn at 40 to 70 pixels, so the subject must read as
+one bold shape.
+
+Shared style line for this section (paste into every prompt below):
+
+> Square 256x256 game UI icon for a top-down fantasy-tech tower defense game.
+> A single bold centred symbol on a round dark-navy badge with a thin coloured
+> rim, flat vector shading with soft cel highlights, readable at 48 pixels, no
+> text, no letters or numbers, nothing outside the badge, transparent
+> background, PNG.
+
+### Gunner
+
+**`upgrade_gun_dmg.png`** (Heavy Rounds: +22% damage)
+> A stack of three oversized brass bullets with heavy blunt tips. Rim and accents in #4fc3f7.
+
+**`upgrade_gun_rate.png`** (Feed System: +18% fire rate)
+> An ammunition feed belt curling into a gun breech, with motion streaks. Rim and accents in #4fc3f7.
+
+**`upgrade_gun_range.png`** (Long Barrel: +12% range)
+> A long rifled gun barrel extending diagonally across the badge. Rim and accents in #4fc3f7.
+
+### Cannon
+
+**`upgrade_cannon_dmg.png`** (Heavy Shells: +24% damage)
+> A fat black cannonball with a glowing orange crack, ready to burst. Rim and accents in #ff8a65.
+
+**`upgrade_cannon_blast.png`** (Wide Blast: +16% blast radius)
+> A wide round shockwave ring of smoke and debris spreading from an impact point. Rim and accents in #ff8a65.
+
+**`upgrade_cannon_rate.png`** (Auto Rammer: +18% fire rate)
+> A mechanical ramrod pushing a shell into a cannon mouth, with speed lines. Rim and accents in #ff8a65.
+
+**`upgrade_cannon_range.png`** (Rangefinder: +12% range)
+> A brass optical rangefinder with two lenses and a crosshair. Rim and accents in #ff8a65.
+
+### Frost
+
+**`upgrade_frost_slow.png`** (Cryo Core: +5% slow)
+> A glowing pale-blue ice crystal core inside a metal cage. Rim and accents in #81d4fa.
+
+**`upgrade_frost_dur.png`** (Coolant Tanks: +0.5s slow)
+> Two frosted coolant canisters with blue liquid and icy vapour. Rim and accents in #81d4fa.
+
+**`upgrade_frost_dmg.png`** (Chill Damage: +30% damage)
+> A sharp ice shard cracking a stone surface. Rim and accents in #81d4fa.
+
+**`upgrade_frost_blast.png`** (Frost Cloud: +20% blast radius, +6% range)
+> A swirling cloud of frost and snowflakes spreading outward. Rim and accents in #81d4fa.
+
+### Tar Pit
+
+**`upgrade_tarpit_slow.png`** (Thicker Tar: +6% slow)
+> Thick black tar dripping in heavy glossy drops. Rim and accents in #8d6e63.
+
+**`upgrade_tarpit_range.png`** (Wider Pit: +12% range)
+> A wide bubbling tar pool seen from above, with an outer ring. Rim and accents in #8d6e63.
+
+**`upgrade_tarpit_dur.png`** (Clinging Tar: +0.4s slow)
+> A boot stuck in sticky stretching tar strands. Rim and accents in #8d6e63.
+
+### Tesla
+
+**`upgrade_tesla_dmg.png`** (Overcharge: +26% damage)
+> A tesla coil topped with an overcharged violet glowing orb. Rim and accents in #ba68c8.
+
+**`upgrade_tesla_chain.png`** (Arc Splitter: +1 target hit at once)
+> A forked violet lightning bolt splitting into three branches. Rim and accents in #ba68c8.
+
+**`upgrade_tesla_range.png`** (Coil Array: +14% range)
+> A tall stacked copper coil array with sparks at the top. Rim and accents in #ba68c8.
+
+### Marksman
+
+**`upgrade_marksman_dmg.png`** (Match Barrel: +28% damage)
+> A precision rifle bullet with a match-grade polished tip. Rim and accents in #9ccc65.
+
+**`upgrade_marksman_range.png`** (Scope: +13% range)
+> A sniper scope reticle with fine crosshairs. Rim and accents in #9ccc65.
+
+**`upgrade_marksman_rate.png`** (Cycle Action: +22% fire rate)
+> A rifle bolt action mid-cycle with an ejected brass casing. Rim and accents in #9ccc65.
+
+### Flamethrower
+
+**`upgrade_flame_dmg.png`** (Fuel Mix: +26% damage)
+> A jerrycan of fuel with a bright orange flame symbol. Rim and accents in #ff7043.
+
+**`upgrade_flame_chain.png`** (Wide Nozzle: +1 target hit at once)
+> A wide fan-shaped nozzle spraying a cone of fire. Rim and accents in #ff7043.
+
+**`upgrade_flame_burn.png`** (Napalm: +7 burn damage/s)
+> Burning napalm splashing in sticky orange-red flames. Rim and accents in #ff7043.
+
+### Shockwave
+
+**`upgrade_shock_dmg.png`** (Heavier Slam: +26% damage)
+> A heavy steel piston hammer slamming down with a ground crack. Rim and accents in #4db6ac.
+
+**`upgrade_shock_range.png`** (Wider Ring: +14% range, +14% blast radius)
+> Concentric teal shockwave rings rippling across the ground. Rim and accents in #4db6ac.
+
+**`upgrade_shock_rate.png`** (Piston Drive: +22% fire rate)
+> A pair of hydraulic pistons pumping, with motion lines. Rim and accents in #4db6ac.
+
+### Mortar
+
+**`upgrade_mortar_dmg.png`** (Big Shells: +26% damage)
+> A fat mortar shell with fins and a red warhead band. Rim and accents in #a1887f.
+
+**`upgrade_mortar_blast.png`** (Wide Blast: +20% blast radius)
+> A mushroom of dust and fragments from a large explosion seen from above. Rim and accents in #a1887f.
+
+**`upgrade_mortar_rate.png`** (Auto Loader: +25% fire rate)
+> A mortar tube with a shell sliding in by an automatic loader arm. Rim and accents in #a1887f.
+
+**`upgrade_mortar_range.png`** (Spotter Drone: +15% range, -25% dead zone)
+> A small quadcopter spotter drone with a camera eye. Rim and accents in #a1887f.
+
+### Ballista
+
+**`upgrade_ballista_dmg.png`** (Iron Bolts: +24% damage)
+> A heavy iron-tipped ballista bolt. Rim and accents in #a1887f.
+
+**`upgrade_ballista_volley.png`** (Extra Arms: +1 bolt per volley)
+> Three ballista bolts flying side by side in a volley. Rim and accents in #a1887f.
+
+**`upgrade_ballista_rate.png`** (Winch Crew: +20% fire rate)
+> A wooden winch with rope coiled around a drum and a crank handle. Rim and accents in #a1887f.
+
+### Focus Laser
+
+**`upgrade_laser_dmg.png`** (Pump Array: +24% damage)
+> A compact energy pump array with three pink glowing capacitors. Rim and accents in #f06292.
+
+**`upgrade_laser_focus.png`** (Lens Stack: +0.8x focused damage)
+> A stack of three glass lenses focusing a pink beam to a bright point. Rim and accents in #f06292.
+
+**`upgrade_laser_range.png`** (Collimator: +14% range)
+> A long collimator tube emitting a thin straight pink beam. Rim and accents in #f06292.
+
+### Gold Mine
+
+**`upgrade_mine_income.png`** (Deeper Shaft: +30% gold per wave)
+> A deep mine shaft entrance with a gold nugget glinting inside. Rim and accents in #ffca28.
+
+**`upgrade_mine_rate.png`** (Night Shift: +18% gold per wave)
+> A crescent moon over a miner's lantern and a small gold coin. Rim and accents in #ffca28.
+
+**`upgrade_mine_range.png`** (Survey Team: +25% gold per wave)
+> A surveyor's flag planted in rock beside a gold vein. Rim and accents in #ffca28.
+
+### Tide Caller
+
+**`upgrade_tide_range.png`** (Pressure Jets: +12% range)
+> Pressurised water jets spraying outward in an arc. Rim and accents in #26c6da.
+
+**`upgrade_tide_slow.png`** (Riptide: +8% slow, +0.3s slow)
+> A swirling riptide whirlpool in deep teal water. Rim and accents in #26c6da.
+
+**`upgrade_tide_dmg.png`** (Tsunami: +22% damage, +12% blast radius)
+> A towering curling tsunami wave. Rim and accents in #26c6da.
+
+### Torpedo Battery
+
+**`upgrade_torpedo_dmg.png`** (Warheads: +26% damage)
+> A torpedo warhead nose with a red tip and rivets. Rim and accents in #4dd0e1.
+
+**`upgrade_torpedo_pierce.png`** (Spread Tubes: +1 enemy pierced per shot)
+> A spread of three torpedoes fanning out underwater with bubble trails. Rim and accents in #4dd0e1.
+
+**`upgrade_torpedo_rate.png`** (Loading Gear: +20% fire rate)
+> A torpedo loading cradle with gears and a chain hoist. Rim and accents in #4dd0e1.
+
+### Wave Cannon
+
+**`upgrade_wavegun_push.png`** (Storm Surge: +10 knockback)
+> A powerful surge of water pushing chevron-shaped waves against a wall. Rim and accents in #4fc3f7.
+
+**`upgrade_wavegun_dmg.png`** (Pressure Charge: +24% damage, +10% blast radius)
+> A pressure gauge with its needle in the red zone and a water burst. Rim and accents in #4fc3f7.
+
+**`upgrade_wavegun_rate.png`** (Pump Room: +20% fire rate)
+> A pump room wheel valve with pipes and spraying droplets. Rim and accents in #4fc3f7.
+
+### Airfield
+
+**`upgrade_airfield_rate.png`** (Ground Crew: +20% fire rate)
+> A crossed wrench and spanner over an airfield runway stripe. Rim and accents in #aed581.
+
+**`upgrade_airfield_bombs.png`** (Bomb Racks: +1 rounds per sortie)
+> A rack of three small aerial bombs with tail fins. Rim and accents in #aed581.
+
+**`upgrade_airfield_dmg.png`** (Heavy Payload: +24% damage)
+> A single heavy aerial bomb with a glowing payload stripe. Rim and accents in #aed581.
+
+**`upgrade_airfield_squad.png`** (Second Bomber: +1 aircraft, +15% aircraft speed)
+> Two small green bomber silhouettes flying in formation. Rim and accents in #aed581.
+
+### Helipad
+
+**`upgrade_helipad_dmg.png`** (Autocannon: +28% damage)
+> A chunky rotary autocannon barrel cluster. Rim and accents in #ffb74d.
+
+**`upgrade_helipad_ammo.png`** (Ammo Belts: +5 rounds per sortie)
+> A looping belt of brass ammunition rounds. Rim and accents in #ffb74d.
+
+**`upgrade_helipad_speed.png`** (Uprated Rotors: +20% aircraft speed, +10% fire rate)
+> A helicopter rotor hub with blurred spinning blades. Rim and accents in #ffb74d.
+
+**`upgrade_helipad_squad.png`** (Wing Escort: +1 aircraft)
+> Two small orange helicopter silhouettes flying in escort formation. Rim and accents in #ffb74d.
+
+### Command Post
+
+**`upgrade_command_aura_dmg.png`** (Doctrine: +10% damage aura)
+> A gold upward arrow inside a radiating command ring, like a rally banner. Rim and accents in #f5f5f5.
+
+**`upgrade_command_aura_rate.png`** (Logistics: +10% fire rate aura)
+> Double upward chevrons inside a radiating ring, signalling faster tempo. Rim and accents in #f5f5f5.
+
+**`upgrade_command_range.png`** (Comms Array: +18% range)
+> A radio antenna mast broadcasting signal arcs. Rim and accents in #f5f5f5.

@@ -21,6 +21,10 @@ func _ready() -> void:
 		wanted.append("enemy_%s" % kind)
 	for unit: String in ["unit_plane", "unit_heli", "shot"]:
 		wanted.append(unit)
+	# One picture per upgrade track, drawn on the track's button.
+	for type_id: String in TDData.TOWER_ORDER:
+		for t: Dictionary in TDData.tracks(type_id):
+			wanted.append(UpgradeIcon.art_name(type_id, str(t["key"])))
 
 	var have: Array = []
 	var missing: Array = []

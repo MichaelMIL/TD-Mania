@@ -113,12 +113,6 @@ func _build() -> void:
 			"Drag towers from the palette  ·  Space starts a wave early  ·  A auto-start  ·  U upgrade  ·  T target  ·  X sell",
 			13, Color(1, 1, 1, 0.4)))
 
-	var quit := Button.new()
-	quit.text = "Quit"
-	quit.custom_minimum_size = Vector2(90.0, 34.0)
-	quit.focus_mode = Control.FOCUS_NONE
-	quit.pressed.connect(func(): get_tree().quit())
-	foot.add_child(quit)
 
 
 ## Account strip. Two rows rather than one: progress on top, what the
@@ -340,6 +334,11 @@ func _modifier_row() -> Control:
 		b.tooltip_text = str(m["note"])
 		b.custom_minimum_size = Vector2(0.0, 26.0)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		# Share the row rather than widen the card: four full names made
+		# every card wider than a third of the screen, pushing the whole
+		# grid past its right edge.
+		b.clip_text = true
+		b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		b.add_theme_font_size_override("font_size", 11)
 		b.focus_mode = Control.FOCUS_NONE
 		b.modulate = Color("9ce89c") if on else Color(1, 1, 1, 0.55)
@@ -500,6 +499,7 @@ func _difficulty_pill(level: Dictionary) -> Control:
 
 
 func _play(index: int, resume: bool = false) -> void:
+	TDData.active_challenge = {}
 	TDData.selected_level = index
 	TDData.resume_run = resume
 	if not resume:

@@ -21,6 +21,9 @@ const UPGRADE_FLOOR := 350
 
 var game: Node
 var mix_index: int = 0
+## What it tries to build, in order. The wish list unless a harness hands
+## it another (a challenge's own towers, say).
+var wish: Array = WISH
 
 
 func _init(match_node: Node) -> void:
@@ -66,8 +69,8 @@ func _upgrade_something() -> bool:
 func _act() -> void:
 	# Upgrade ranks are account purchases now, so a run is only about placing
 	# towers: walk the wish list and build the first affordable choice.
-	for offset in WISH.size():
-		var want: String = WISH[(mix_index + offset) % WISH.size()]
+	for offset in wish.size():
+		var want: String = wish[(mix_index + offset) % wish.size()]
 		if game.gold < game.tower_cost(want):
 			continue
 		var spot: Vector2i = _support_spot() if want == "command" else _find_spot(want)

@@ -6,6 +6,8 @@ config_version=5
 config/name="TD Mania"
 config/description="Wave-based tower defence: twenty maps, eighteen towers, endless waves."
 run/main_scene="res://main.tscn"
+; Replaceable: see the icon entry at the end of assets/PROMPTS.md.
+config/icon="res://assets/icon.png"
 ; A 2D tower defence has no business rendering at 120 Hz on a laptop;
 ; the App autoload lowers this further while the window is unfocused.
 run/max_fps=60
@@ -15,13 +17,30 @@ config/features=PackedStringArray("4.7", "Forward Plus")
 
 Audio="*res://scripts/audio.gd"
 App="*res://scripts/app.gd"
+TouchScroll="*res://scripts/touch_scroll.gd"
 
 [display]
 
 window/size/viewport_width=1520
 window/size/viewport_height=902
 window/stretch/mode="canvas_items"
-window/stretch/aspect="keep"
+; "expand" fills whatever shape the screen is; the HUD lays itself out from
+; the viewport it gets rather than from the design size.
+window/stretch/aspect="expand"
+; Phones and tablets hold the board sideways; the HUD has no portrait layout.
+window/handheld/orientation=4
+
+[gui]
+
+; A phone has no hover: a finger resting after a tap would otherwise pop a
+; tooltip over the board. Every button carries its own words on mobile.
+timers/tooltip_delay_sec.mobile=3600.0
+
+[input_devices]
+
+; Touch arrives as left-button mouse events, so one code path serves both.
+; The game tells the two apart by InputEvent.device (-1 means emulated).
+pointing/emulate_mouse_from_touch=true
 
 [rendering]
 
@@ -31,3 +50,6 @@ renderer/rendering_method.mobile="mobile"
 renderer/rendering_method.web="gl_compatibility"
 environment/defaults/default_clear_color=Color(0.06, 0.08, 0.11, 1)
 anti_aliasing/quality/msaa_2d=2
+; Android refuses to export without a compressed-texture format it can read.
+; The game draws almost everything, so this costs nothing at import.
+textures/vram_compression/import_etc2_astc=true

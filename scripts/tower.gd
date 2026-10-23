@@ -709,12 +709,34 @@ func _draw_base(col: Color) -> void:
 	draw_circle(Vector2(0.0, 3.0), 22.0, Color(0, 0, 0, 0.3))
 	_draw_plating(col)
 	if int(def()["terrain"]) == TDData.Terrain.WATER:
-		# Water towers read as a platform on stilts.
-		draw_rect(Rect2(-21.0, -21.0, 42.0, 42.0), Color("22333d"))
-		draw_rect(Rect2(-21.0, -21.0, 42.0, 42.0), col.darkened(0.35), false, 2.5)
-		for i in 4:
-			var p := Vector2(-13.0 + 8.66 * float(i), -13.0 + 8.66 * float(i))
-			draw_line(Vector2(-19.0, p.y), Vector2(19.0, p.y), Color(1, 1, 1, 0.05), 1.0)
+		# The three water towers used to share one square deck, which left
+		# them telling apart only by a slightly different cyan. Each now sits
+		# on its own footing, so a river full of them reads at a glance.
+		match type_id:
+			"tide":
+				# A round basin: open water, ringed by a low wall.
+				draw_circle(Vector2.ZERO, 21.0, Color("1b3540"))
+				draw_circle(Vector2.ZERO, 16.0, Color(col.r, col.g, col.b, 0.22))
+				draw_arc(Vector2.ZERO, 21.0, 0.0, TAU, 28, col.darkened(0.3), 3.0, true)
+				for i in 2:
+					draw_arc(Vector2.ZERO, 8.0 + 5.0 * float(i), 0.0, TAU, 20,
+							Color(1, 1, 1, 0.12), 1.0, true)
+			"torpedo":
+				# A slipway: long, narrow, pointing down the firing line.
+				draw_set_transform(Vector2.ZERO, turret_angle, Vector2.ONE)
+				draw_rect(Rect2(-22.0, -13.0, 44.0, 26.0), Color("1d2740"))
+				draw_rect(Rect2(-22.0, -13.0, 44.0, 26.0), col.darkened(0.35), false, 2.5)
+				for i in 3:
+					var x := -12.0 + 12.0 * float(i)
+					draw_line(Vector2(x, -11.0), Vector2(x, 11.0), Color(1, 1, 1, 0.07), 1.0)
+				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			_:
+				# A breakwater: a broad wall with the sea piled against it.
+				draw_rect(Rect2(-22.0, -8.0, 44.0, 28.0), Color("13263d"))
+				draw_rect(Rect2(-22.0, -8.0, 44.0, 28.0), col.darkened(0.3), false, 2.5)
+				for i in 3:
+					draw_arc(Vector2(-14.0 + 14.0 * float(i), -8.0), 6.0, PI, TAU, 10,
+							Color(1, 1, 1, 0.16), 2.0, true)
 	elif is_air():
 		draw_rect(Rect2(-22.0, -22.0, 44.0, 44.0), Color("2b3446"))
 		draw_rect(Rect2(-22.0, -22.0, 44.0, 44.0), col.darkened(0.4), false, 2.0)
@@ -807,18 +829,26 @@ func _draw_turret(col: Color) -> void:
 				draw_arc(Vector2(length * 0.8 + back, 0.0), lens + 3.0 + 2.5 * float(i),
 						-0.8, 0.8, 8, Color(col.r, col.g, col.b, 0.5), 1.5, true)
 		"wavegun":
-			draw_rect(Rect2(2.0 + back, -width * 0.6, length * 0.7, width * 1.2),
-					col.darkened(0.25))
+			# No barrel at all: a broad curved crest that throws the water
+			# forward, wider than it is long.
+			var crest := length * 0.5 + back
+			draw_colored_polygon(PackedVector2Array([
+					Vector2(back - 2.0, -width * 1.15), Vector2(crest, -width * 0.8),
+					Vector2(crest + 5.0, 0.0), Vector2(crest, width * 0.8),
+					Vector2(back - 2.0, width * 1.15)]), col.darkened(0.25))
 			for i in 3:
-				draw_arc(Vector2(length * 0.75 + back, 0.0), muzzle + 3.0 + 4.0 * float(i),
-						-1.0, 1.0, 10, Color(col.r, col.g, col.b, 0.55 - 0.12 * float(i)),
-						2.5, true)
+				draw_arc(Vector2(crest - 2.0, 0.0), width * 0.95 + 5.0 * float(i),
+						-1.25, 1.25, 14,
+						Color(1, 1, 1, 0.4 - 0.1 * float(i)), 2.5, true)
 		"tide":
-			draw_rect(Rect2(2.0 + back, -width * 0.55, length * 0.8, width * 1.1),
-					col.darkened(0.25))
-			draw_circle(Vector2(length * 0.9 + back, 0.0), muzzle + 1.0, col.lightened(0.2))
-			draw_arc(Vector2(length * 0.9 + back, 0.0), muzzle + 4.0, -0.9, 0.9, 10,
-					Color(1, 1, 1, 0.35), 2.0, true)
+			# A spout rather than a gun: rings of water going out in every
+			# direction, so it does not read as something that aims.
+			draw_circle(Vector2.ZERO, muzzle + 5.0, col.darkened(0.3))
+			draw_circle(Vector2.ZERO, muzzle + 1.5, col.lightened(0.25))
+			draw_circle(Vector2.ZERO, muzzle * 0.5, Color(1, 1, 1, 0.75))
+			for i in 3:
+				draw_arc(Vector2.ZERO, 11.0 + 6.0 * float(i), 0.0, TAU, 24,
+						Color(col.r, col.g, col.b, 0.5 - 0.13 * float(i)), 2.0, true)
 		"marksman":
 			draw_rect(Rect2(2.0 + back, -width * 0.3, length * 1.15, width * 0.6),
 					col.darkened(0.2))
@@ -848,12 +878,17 @@ func _draw_turret(col: Color) -> void:
 				draw_circle(Vector2(-8.0 - 3.0 * float(i) + back, 0.0), 2.2,
 						Color(1, 1, 1, 0.35))
 		"torpedo":
+			# Long tubes with a nose on each: the longest silhouette of the
+			# three, and the only one that is clearly pointing somewhere.
 			for i in tubes:
 				var offset := -width * 0.55 + width * 1.1 * float(i) / float(maxi(1, tubes - 1)) \
 						if tubes > 1 else 0.0
-				draw_rect(Rect2(2.0 + back, offset - 2.5, length * 0.85, 5.0),
+				draw_rect(Rect2(2.0 + back, offset - 3.0, length * 1.2, 6.0),
 						col.darkened(0.2))
-				draw_circle(Vector2(length * 0.85 + back, offset), 3.0, col.lightened(0.3))
+				draw_colored_polygon(PackedVector2Array([
+						Vector2(length * 1.2 + back, offset - 3.0),
+						Vector2(length * 1.2 + 7.0 + back, offset),
+						Vector2(length * 1.2 + back, offset + 3.0)]), col.lightened(0.3))
 		_:
 			for i in tubes:
 				var y := (float(i) - float(tubes - 1) * 0.5) * (width * 0.55)

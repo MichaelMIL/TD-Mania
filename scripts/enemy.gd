@@ -35,6 +35,8 @@ var burn_source: Node = null
 var hit_flash: float = 0.0
 ## How shove-resistant this creep currently is; see push_back().
 var push_fatigue: float = 0.0
+## Counts down after a shove, during which no further shove lands at all.
+var push_lock: float = 0.0
 ## Flyers cut across the map and can only be shot by towers that reach up.
 var flying: bool = false
 ## Hits absorbed outright before damage starts landing. Wave affixes hand
@@ -109,6 +111,10 @@ func setup(k: String, hp_mult: float, speed_mult: float, points: PackedVector2Ar
 	# Half a period in, so a boss does something before it is halfway home.
 	ability_clock = ability_period * 0.5
 	flying = bool(d.get("flying", false))
+	# A flyer is above the board, so it is drawn above the towers too; the
+	# enemy layer comes before the tower layer, which put wings under roofs.
+	# Projectiles and aircraft sit higher still (see game._build_world).
+	z_index = 20 if flying else 0
 	if flying:
 		# Flyers ignore the road entirely: spawn point straight to the base.
 		# Reusing the same two-point polyline keeps progress, lanes, slows
@@ -135,6 +141,8 @@ func _process(delta: float) -> void:
 		queue_redraw()
 	if push_fatigue > 0.0:
 		push_fatigue = maxf(0.0, push_fatigue - delta * PUSH_FATIGUE_DECAY)
+	if push_lock > 0.0:
+		push_lock = maxf(0.0, push_lock - delta)
 	if haste_timer > 0.0:
 		haste_timer -= delta
 		if haste_timer <= 0.0:
@@ -194,11 +202,20 @@ func _process(delta: float) -> void:
 ## hold a lane at a standstill forever. Fatigue decays in `_process`.
 const PUSH_FATIGUE_MAX := 4.0
 const PUSH_FATIGUE_DECAY := 1.2
+## Fatigue alone was not enough, because it only shortens each shove and two
+## Wave Cannons firing together landed two of them on the same creep in the
+## same instant. For a moment after being shoved a creep cannot be shoved
+## again at all, so a second cannon adds damage rather than more distance
+## and a line of them can no longer pin the road.
+const PUSH_IMMUNE := 0.2
 
 
+## Shoves a creep back down its road. Damage is applied by the caller and is
+## never blocked by the lock — only the movement is.
 func push_back(distance: float) -> void:
-	if dead or path.size() < 2:
+	if dead or path.size() < 2 or push_lock > 0.0:
 		return
+	push_lock = PUSH_IMMUNE
 	var remaining := distance / (1.0 + push_fatigue)
 	push_fatigue = minf(PUSH_FATIGUE_MAX, push_fatigue + 1.0)
 	while remaining > 0.0:

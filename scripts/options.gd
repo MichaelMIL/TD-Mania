@@ -130,6 +130,8 @@ func _build() -> void:
 	var full := _button("Fullscreen", 110.0)
 	full.pressed.connect(_on_fullscreen)
 	scale_row.add_child(full)
+	# A phone has one window size and is always full screen.
+	scale_row.visible = not OS.has_feature("mobile")
 	var cap_row := HBoxContainer.new()
 	cap_row.add_theme_constant_override("separation", 6)
 	window_col.add_child(cap_row)
@@ -142,10 +144,11 @@ func _build() -> void:
 	window_col.add_child(_label("A lower cap is cooler and quieter; 60 looks the same as 120 here.",
 			11, Color(1, 1, 1, 0.45)))
 
-	window_col.add_child(_label("The board is drawn at %d x %d; the window is a multiple of that."
-			% [int(ProjectSettings.get_setting("display/window/size/viewport_width")),
-			int(ProjectSettings.get_setting("display/window/size/viewport_height"))],
-			11, Color(1, 1, 1, 0.45)))
+	if not OS.has_feature("mobile"):
+		window_col.add_child(_label("The board is drawn at %d x %d; the window is a multiple of that."
+				% [int(ProjectSettings.get_setting("display/window/size/viewport_width")),
+				int(ProjectSettings.get_setting("display/window/size/viewport_height"))],
+				11, Color(1, 1, 1, 0.45)))
 
 	var access_card := PanelContainer.new()
 	access_card.add_theme_stylebox_override("panel", _sb(Color("121a26"), Color("2c3a52")))

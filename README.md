@@ -28,13 +28,111 @@ godot --headless --export-release "macOS" "build/macos/TD Mania.zip"
 
 The web build runs on WebGL2 — `rendering_method.web` is set to
 `gl_compatibility`, since the Forward+ path the desktop build uses cannot.
-`dev/` is excluded from both, so the harnesses do not ship.
+`dev/` is excluded from every preset, so the harnesses do not ship.
 
 `.github/workflows/checks.yml` runs `dev/run_checks.sh` on every push and,
-if it passes, builds the web export and keeps it as a workflow artifact.
-Serving it needs cross-origin isolation headers (the preset asks for them);
-the workflow uploads rather than deploys, so pointing it at GitHub Pages is
-a few lines when you want a public link.
+if it passes, builds the web export and an Android APK and keeps both as
+workflow artifacts. Serving the web build needs cross-origin isolation
+headers (the preset asks for them); the workflow uploads rather than
+deploys, so pointing it at GitHub Pages is a few lines when you want a
+public link.
+
+### Phones and tablets
+
+Presets for **Android** and **iOS** are committed too. Both run the
+`mobile` renderer, lock to landscape, and use `assets/icon.png` as the app
+icon (a placeholder; the prompt to replace it is at the end of
+`assets/PROMPTS.md`).
+
+```bash
+godot --headless --export-debug "Android" "build/android/TD Mania.apk"
+godot --headless --export-release "iOS" "build/ios/TD Mania.xcodeproj"
+```
+
+**Android** needs the Android SDK (platform-tools and build-tools), a JDK
+(17 or 21) and a debug keystore, pointed to from Godot's editor settings
+under `export/android/`. The APK is debug-signed and installs on any phone
+with sideloading on: `adb install "build/android/TD Mania.apk"`. A Play
+Store build wants a release keystore in `keystore/release` and
+`gradle_build/export_format` set to AAB.
+
+**iOS** needs a Mac with Xcode. The preset exports an Xcode project rather
+than an `.ipa`, because signing is Xcode's job: open
+`build/ios/TD Mania.xcodeproj`, pick your team under Signing, and run it on
+a plugged-in iPhone or iPad. The team ID in the preset is the personal team
+Xcode on the machine that made it was signed in with; change it to yours in
+the preset or in Xcode. A personal team's app has to be trusted once on the
+phone (Settings, General, VPN & Device Management) before iOS will open it. Godot's simulator library is x86_64 only, so on an Apple
+Silicon Mac the simulator needs a Rosetta destination; a real device is
+simpler.
+
+On a touch screen the game plays the same way with a finger: drag a card
+onto the board (the tower floats a little above the finger so the cell is
+visible), or tap a card and then a cell; tap the card again to put it away.
+Tapping a tower selects it. Every key has a button on screen; the Android
+back button does what Escape does. Sending the app to the background parks
+the run, exactly as the Menu button would, so a phone killing it costs
+nothing.
+
+Phones and tablets get the **handheld layout** (`hud.gd`): the top bar
+spans the screen, the board is scaled to fit under it, the wave readout
+runs along the bottom of the board, and the column beside it shows the
+build palette until a tower is selected, then that tower's stats, upgrade
+tracks and actions. The column folds away with the arrow in its header
+and comes back from the tab at the screen's edge (or when a tower is
+tapped); the board is usually bound by the screen's height, so folding
+clears the side of the screen rather than growing the board. Between
+waves a **Start now** button sits beside the countdown, since the desktop
+line's key hint means nothing to a thumb. Text is scaled from the screen's pixel density so a
+body line comes out around 2 mm tall whatever the device, the pause menu
+and walkthrough are blown up to match, and the menu screens are simply
+scaled as far as the level select still fits across. The window fills the
+screen whatever its shape (`stretch/aspect` is `expand`); on a desktop the
+palette and the info bar take any extra width or height. To look at the
+handheld layout in a desktop window:
+
+```bash
+godot --resolution 1300x600 -- --phone        # a phone-shaped window
+godot --resolution 1300x600 -- --phone=2.2    # with a given text scale
+godot --resolution 1389x642 -- --phone=2.28 --safe=70,0,70,32   # iPhone 13 Pro Max, notch and all
+```
+
+Everything that carries information stays inside the screen's **safe
+area**, the part no notch, rounded corner or home bar covers
+(`App.safe_margins`, read from the OS on a device or from `--safe` as
+window pixels on a desktop). The match insets its bars and column and
+masks the board's edges; the menu screens are inset as a whole.
+
+Lists scroll with a finger wherever it lands (`scripts/touch_scroll.gd`).
+Godot's own touch scrolling only hears a drag that starts on a list's
+background, and nearly every pixel of the palette or the level select is a
+card or a button. So a touch inside a scrollable list is held back for a
+moment: moved along the list, it scrolls (and coasts when flung); lifted
+in place, it is replayed as a tap; moved across the list, it is replayed
+and passed through, which is how a palette card dragged sideways still
+carries its tower onto the map.
+
+Every upgrade track shows a picture on its button
+(`scripts/upgrade_icon.gd`): `assets/upgrade_<tower>_<track>.png` when it
+exists, otherwise a badge in the tower's colour with a symbol for what the
+upgrade does (a burst for damage, chevrons for fire rate, a crosshair for
+range, a snowflake for a slow, a coin for income). The 59 prompts are at the
+end of `assets/PROMPTS.md`; `dev/dev_icons.tscn` lays every picture out on
+one screen. Each upgrade button carries its name and rank (a star marks a
+track whose last rank unlocks an ability) over either its price and what it
+buys or why it is locked, so nothing has to be hovered to decide. On a
+phone the tower panel lists one upgrade per row and scrolls, with Target,
+Move and Sell pinned underneath it; the ability note sits under the list,
+and touch sends no hover text or tooltips, so nothing moves under a finger.
+
+Buttons share one look, set on the engine's default theme in `app.gd`:
+bordered and lit enough to read in daylight. A palette card says what it
+is by its border and price (gold to buy, red too dear, green armed, grey
+locked), and an upgrade button by its colour (green outline to buy, red
+too dear, gold maxed, grey locked).
+
+`dev/dev_shot.tscn` takes the same flags, so a layout change can be
+screenshotted without a device.
 
 ## Save slots
 
@@ -143,7 +241,35 @@ still overrides the generated version.
 
 Every run pays out **XP** and **coins**, scaled by waves survived, score and
 the map's difficulty tier. Leaving to the menu banks the run too, so a good
-attempt is never wasted — but a run only ever pays once.
+attempt is never wasted — but a run only ever pays once, and a run that used
+a developer toggle pays nothing at all (it is already kept out of the record
+books; paying it put the account there instead, and a few such runs were
+worth more XP than a hundred honest ones).
+
+The pace is measured rather than guessed:
+
+```bash
+godot --headless --fixed-fps 5 --quit-after 5000000 dev/dev_progress.tscn -- --runs 20 --spread
+```
+
+`dev/dev_progress.tscn` plays runs with the crude player, banks each one
+into a real account, and says which run every unlock landed on. It is what
+caught the curve being far too short: the first run alone used to pay three
+towers and two maps, every tower was out by run 15, every map by run 30 and
+the whole tech tree was bought by run 20 — a game of eighteen towers and
+thirty maps handed over in an evening. The curve and the unlock levels were
+stretched against that harness until the roster arrives over a campaign:
+
+| Milestone | Was | Now |
+| --- | --- | --- |
+| Every tower | run 15 | run 82 |
+| Every map | run 30 | run 118 |
+| All doctrine | run 20 | run 51 |
+| Every rank in the tech tree | run 71 | run 116 |
+| Level cap | run 117 | run 160 |
+
+A save from before the stretch keeps the level it had, so nothing already
+earned is repossessed; it simply carries on at the new pace.
 
 **Account level** unlocks the roster. You start with the Gunner and Cannon;
 the rest arrive as you level, and a handful of advanced upgrade tracks are
@@ -152,17 +278,24 @@ gated the same way:
 | Level | Unlocks |
 | --- | --- |
 | 1 | Gunner, Cannon |
-| 2 | Frost · Gunner's Long Barrel |
-| 3 | Marksman |
-| 4 | Tide Caller · Cannon's Rangefinder |
-| 5 | Tesla · Marksman's Cycle Action |
-| 6 | Flamethrower · Frost Cloud · Tsunami |
-| 7 | Airfield · Arc Splitter |
-| 8 | Torpedo Battery · Napalm |
-| 9 | Mortar · Second Bomber · Spread Tubes |
-| 10 | Helipad · Spotter Drone |
-| 11 | Command Post |
-| 12 | Wing Escort · Comms Array |
+| 3 | Frost · Gunner's Long Barrel |
+| 5 | Marksman |
+| 7 | Tar Pit · Tide Caller · Cannon's Rangefinder |
+| 9 | Tesla · Frost Cloud · Cycle Action |
+| 11 | Flamethrower · Gold Mine · Clinging Tar · Tsunami |
+| 13 | Airfield · Arc Splitter |
+| 15 | Napalm · Survey Team |
+| 16 | Shockwave · Torpedo Battery · Spread Tubes · Second Bomber |
+| 18 | Mortar · Piston Drive · Spotter Drone |
+| 20 | Ballista · Helipad · Wing Escort |
+| 22 | Command Post · Winch Crew · Comms Array |
+| 24 | Focus Laser |
+| 26 | Collimator |
+| 28 | Wave Cannon |
+| 30 | Pump Room |
+
+Maps unlock the same way, the last of the thirty at level 34, and the
+ladder caps at 40.
 
 The menu shows your level, XP bar, coin balance and what unlocks next.
 
@@ -197,7 +330,7 @@ than dropping straight into a list of maps with everything else hidden in a
 strip above it.
 
 **Escape always does the most useful thing available**, in that order: shut
-an open panel (tuning, cheats), close the pause menu, drop what you are
+an open panel (the balance editor), close the pause menu, drop what you are
 placing or have selected, and only then pause. On any other screen it goes
 back one step.
 
@@ -377,8 +510,33 @@ heather, cacti, broken columns, driftwood) and colour wash, so they read as
 different places at a glance.
 
 Terrain decides what you can build where: **ground** takes land towers,
-**water** takes only the Tide Caller and Torpedo Battery, and **rock** and the
-**path** take nothing.
+**water** takes only the three water towers, and **rock** and the **path**
+take nothing.
+
+The three share a terrain, so each is there for a different reason rather
+than being three ways to shoot across a river. The **Tide Caller** is the
+chill: a strong, long slow, and the only water tower that can reach a
+flyer — it does little damage itself and is built to hold things still for
+everything else. The **Wave Cannon** is the shove: no slow at all, but it
+breaks a wave over the road and sends creeps back the way they came. The
+**Torpedo Battery** is the long gun: the longest reach in the game and the
+hardest single shot, splashing nothing and slowing nothing. The verify
+suite checks they stay apart.
+
+They used to look alike too — one square deck each and three shades of the
+same cyan, one of which was the Gunner's exact blue. Each now has its own
+footing and silhouette, on the board and on its palette card: the Tide
+Caller is a round cyan basin with a spout and ripples going out in every
+direction (it does not read as something that aims), the Torpedo Battery is
+a narrow indigo slipway with long tubes and nose cones pointing down the
+firing line, and the Wave Cannon is a broad navy breakwater with the sea
+piled against it and no barrel at all.
+
+A shoved creep cannot be shoved again for 200 ms (`Enemy.PUSH_IMMUNE`), on
+top of the older fatigue that shortens repeated shoves. Without it two Wave
+Cannons firing together landed two full shoves on the same creep in the
+same instant and simply pinned the road; now the second one adds its damage
+instead. Damage is never blocked by the lock, only the movement.
 
 ### Towers
 
@@ -399,9 +557,9 @@ every cell it can legally occupy is outlined — handy for the water-only ones.
 | Ballista | 200 | 10 | Ground | Looses bolts at several creeps at once, each skewering the line behind it |
 | Focus Laser | 230 | 12 | Ground | Beam that bores harder the longer it stays on one creep |
 | Gold Mine | 150 | 6 | Ground | Fires nothing; pays gold at the end of every wave |
-| Tide Caller | 150 | 4 | **Water only** | Long-range torrents that splash and slow |
-| Torpedo Battery | 180 | 8 | **Water only** | Torpedoes run in a line and hit everything they pass |
-| Wave Cannon | 190 | 14 | **Water only** | Breaks a wave that shoves creeps back down the road |
+| Tide Caller | 150 | 7 | **Water only** | A long, strong chill, and the only water tower that reaches flyers; little damage of its own |
+| Torpedo Battery | 180 | 16 | **Water only** | The longest reach in the game; a line that skewers everything it passes, with no splash or slow |
+| Wave Cannon | 205 | 28 | **Water only** | Shoves creeps back down the road; no slow at all |
 | Airfield | 210 | 7 | Ground | Launches a bomber that bombs the leaders and lands to rearm |
 | Helipad | 240 | 10 | Ground | Sends a gunship that hovers and strafes until out of ammo |
 | Command Post | 200 | 11 | Ground | Fires nothing; buffs damage and fire rate of towers in its radius |
@@ -424,6 +582,36 @@ Every attacking tower has its own targeting priority, cycled with the
 **Last** (the newest arrival), **Weakest** / **Strongest** (smallest or largest
 health pool), **Lowest HP** / **Highest HP** (most wounded or healthiest).
 Chaining beams and aircraft follow their tower's choice too.
+
+### Rushing a wave
+
+The **Start Wave** button does not go quiet once a wave is walking: it
+becomes **Rush**, and pressing it calls the next wave in on top of the one
+already on the board. Both run at once — the new creeps are merged into the
+queue that is already playing — so you take a second wave's worth of
+pressure in exchange for gold now and the finish line sooner.
+
+The bonus is the same rate as calling a wave in early between waves, three
+gold a second of the wait you are giving up, measured as the spawning still
+to come and capped at the same ceiling. A wave that has nearly finished
+spawning is worth almost nothing to rush, which is what stops the button
+being free money at the end of every wave. Each wave still pays its own
+clear bonus when the merged mass finally dies, so rushing trades safety for
+time rather than for gold you would have earned anyway. The status line and
+the wave report name the range: "Waves 7-8 in progress".
+
+Because rushing moves the wave counter before those waves have been
+fought, records count what was actually *cleared* rather than where the
+counter got to — otherwise stacking five waves and dying would have set a
+best wave you never survived. Without a rush the two are the same number.
+
+The goal wave is the last one that can be called in. Winning is only
+checked when a wave *ends*, and a wave that keeps being rushed never ends,
+so without that cap the counter walks straight past the finish line and the
+run is never won at all. The button says "Final wave" once there is nothing
+left to bring forward. Past the line a cleared map runs on into endless and
+can be rushed again; a challenge cannot, because meeting its goal ends the
+run then and there.
 
 ### Auto-start
 
@@ -550,6 +738,77 @@ cannot be built at all under Dry feet, the thirteenth tower is refused
 under Skeleton crew — so an honest run is the only kind there is. The
 in-match info panel names whichever are running.
 
+### Challenges
+
+**Challenges** on the main menu opens twelve fixed challenges and the daily
+one (`scripts/challenges.gd`, `scripts/challenges_screen.gd`). A challenge
+is a map, a set of rules and a wave to reach, and pays its coins the first
+time it is beaten:
+
+| Grade | Challenge | Map | Rules | Goal | Coins |
+| --- | --- | --- | --- | --- | --- |
+| Easy | Gun Line | Verdant Pass | Gunners only | 15 | 80 |
+| Easy | Cold Front | Meadow Loop | Frost and Cannon only | 14 | 90 |
+| Easy | Hold the Ford | Millrace | water towers only, $400 | 16 | 100 |
+| Medium | Shoestring | Orchard Rows | $150, ten towers at most | 13 | 130 |
+| Medium | Glass Base | Willow Bend | three lives | 12 | 140 |
+| Hard | Bare Metal | Old Ruins | no upgrades, no selling | 16 | 200 |
+| Hard | Siege Line | Sunken Quarry | Cannon and Mortar only, $450 — nothing flies | 24 | 200 |
+| Hard | Lean Times | Fernhollow | kills and waves pay half, no mines | 17 | 200 |
+| Hard | Iron Tide | Crossroads | +50% enemy health | 18 | 200 |
+| Hard | Blitz | Desert Wash | enemies 35% faster | 20 | 200 |
+| Hard | Sparks | Obelisk Field | Tesla, Shockwave, Laser only, $600 | 20 | 220 |
+| Hard | Air Power | Windward Highlands | Airfield, Helipad, Command only, $500 | 24 | 220 |
+| Brutal | Iron Gauntlet | Iron Comb | +40% health, 15% faster, ten lives | 15 | 400 |
+| Brutal | Last Stand | Convergence | eight lives, $450, three roads | 20 | 450 |
+| Brutal | Marathon | Windward Highlands | none — just the waves | 35 | 500 |
+
+A challenge lends you its towers even if the account has not unlocked
+them, and the match enforces every rule (`game.gd` `rule`). A kit with
+nothing that can shoot upwards is played without flyers: rather than
+forbidding such a challenge, or letting Cinder Moths sail over a line of
+Cannons untouched, each flyer arrives as its counterpart on the ground
+(`Challenges.GROUND_SWAP`), so the wave is the same size and still has to
+be answered. The card says so. A challenge run
+pays its normal XP and coins on top, but never touches the map's records,
+clears or stars, since it was not played under the map's rules. It parks
+like any run, under its own key, so it never overwrites a parked run of
+the same map.
+
+**The daily challenge** is dealt from the date (`Challenges.daily_for`): a
+map, a kit of four towers (always the Gunner to open with, at least one
+that hits flyers, a water tower only where there is water), one twist
+(lean purse, thin line, hardened, quickstep, no refunds, bare metal, short
+supply or bounty drought) and a goal by the map's tier. The same date
+always deals the same daily on every machine (FNV-1a over the date, not
+Godot's `hash`), including the run's own seed. It turns over at the
+player's midnight, pays once a day, and pays more for an unbroken streak
+(+10 coins a day, up to +50). The main menu's button says whether today's
+is still waiting. There is no server: "the same for everyone" holds
+because everyone's copy deals it the same way.
+
+Goals were measured rather than guessed, against the crude player in two
+forms: a beginner that never upgrades, and a veteran with every tech and
+tower rank bought (`--tech`). `--depth` plays past the goal until the run is
+lost, which shows the headroom:
+
+```bash
+godot --headless --fixed-fps 5 --quit-after 9000000 dev/dev_challenges.tscn -- --depth --days 0
+godot --headless --fixed-fps 5 --quit-after 9000000 dev/dev_challenges.tscn -- --depth --tech --days 0
+godot --headless --fixed-fps 5 --quit-after 2000000 dev/dev_challenges.tscn -- --only-daily --days 21
+```
+
+Easy and Medium goals sit at or just past where the beginner gives out;
+Hard goals about where the veteran does; Brutal goals well past the
+veteran. The gap between the harness and a person is wide — Last Stand,
+first set at ten waves where even the veteran barely got through, was
+beaten comfortably by hand, because a person builds where Convergence's
+three roads meet and the harness builds anywhere — so Brutal is sized for
+real play rather than for the harness. Each challenge's entry in
+`challenges.gd` notes the depths its goal was set from. The same harness
+is how the daily generator lost the Cannon as an opener: kits that opened
+on it died by wave five.
+
 ### Map hazards
 
 Eight of the thirty maps run under a weather rule that bends one thing
@@ -639,7 +898,7 @@ and keeps drawing the rest by hand — and ask where you are up to:
 
 ```bash
 godot --headless --quit-after 100 dev/dev_art.tscn
-# [ART] 12 of 57 sprites in place (21%), plus 3 per-level variants
+# [ART] 12 of 116 sprites in place (10%), plus 3 per-level variants
 ```
 
 All drawing falls back to vector primitives, but `scripts/art.gd` checks
@@ -761,6 +1020,14 @@ so a failure names the suite it came from.
 Adding a check means adding it to the suite it belongs to. Suites must not
 depend on the order they run in — the split turned up one that did, and it
 was a test bug rather than a game bug.
+
+`dev/dev_touch.tscn` is the one harness that drives the game through input
+events rather than calls: it replays what a phone sends (mouse events the
+engine has marked as emulated from touch) and checks the lift on a dragged
+tower, tapping an armed card to put it away, the Android back button, the
+app going to the background, and scrolling the palette and the level
+select with a finger that lands on a card or a button (scroll, tap, fling,
+and a tap that stops a fling). It runs as part of `dev/run_checks.sh`.
 
 ### The balance report
 
@@ -957,21 +1224,20 @@ override any tier stat (`gold`, `lives`, `hp_scale`, `speed_scale`) by naming
 it directly. `dev/dev_verify.tscn` asserts all of those invariants, including
 that the tiers stay ordered and that every tier is actually used.
 
-### Developer cheats
+### Developer toggles
 
-Press **F1** during a match for a cheat panel (available in a debug build, or
-with `--cheats` on an exported one):
+There is no cheat panel. It was a developer tool one keypress from every
+player, and on a touch build there is no F1 to press. What is left in
+`scripts/cheats.gd` is the handful of flags the harnesses set directly —
+god mode, free building, maxed towers — so a simulation can be put into a
+state worth measuring.
 
-*This run* — +$1000, +10 lives, kill all creeps, finish the wave, jump five
-waves, spawn a boss, god mode, free building, 10x speed, maxed buildings
-(every tower you place arrives fully upgraded, and the ones already standing
-are brought up to match), and fill the map with random maxed towers.
-*Account* — +1000 coins, +5000 XP, max level, unlock everything for the
-session, buy every upgrade rank and doctrine node, wipe the slot.
+A run that has had one set is flagged (`game.cheats_used`): it sets no
+record and banks no XP or coins, which is how a save once reached the level
+cap in four maps. The flags reset at the start of every match.
 
-Using any cheat marks the run: the game-over panel says "(cheats used)" and
-the run cannot set a personal best. The toggles reset at the start of every
-match.
+The balance editor (**F2**, `scripts/tuning_panel.gd`) is still there, on
+the same debug gate: a debug build, or `--cheats` on an exported one.
 
 ### Dev harnesses
 

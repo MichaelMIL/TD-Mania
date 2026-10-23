@@ -24,6 +24,49 @@ func has_modifier(id: String) -> bool:
 	return modifiers.has(id)
 
 
+## The challenge this run is played under, or {} for a normal run. See
+## scripts/challenges.gd for what the rules can say.
+var challenge: Dictionary = {}
+
+
+## One of the challenge's rules, or `fallback` when there is none.
+func rule(key: String, fallback: Variant = null) -> Variant:
+	return (challenge.get("rules", {}) as Dictionary).get(key, fallback)
+
+
+## Whether this tower can be built in this run: the account must have
+## unlocked it, unless a challenge lends it — and a challenge can also
+## leave towers out.
+func tower_available(type_id: String) -> bool:
+	if not challenge.is_empty():
+		var rules: Dictionary = challenge.get("rules", {})
+		if rules.has("towers"):
+			return (rules["towers"] as Array).has(type_id)
+		if not Challenges.allows(challenge, type_id):
+			return false
+	return Progress.tower_unlocked(type_id)
+
+
+## The wave that wins the run: the map's last wave, or the challenge's goal.
+func goal_wave() -> int:
+	if not challenge.is_empty():
+		return int(challenge.get("waves", TDData.clear_wave(level_def)))
+	return TDData.clear_wave(level_def)
+
+
+## Where this run is parked: under the map, or under its challenge.
+func run_key() -> String:
+	if not challenge.is_empty():
+		return Challenges.run_key(challenge)
+	return str(level_def["id"])
+
+
+## What the top bar calls this run.
+func title_name() -> String:
+	return str(challenge.get("name", level_def["name"])) if not challenge.is_empty() \
+			else str(level_def["name"])
+
+
 ## A hazard multiplier, or 1.0 where the map has no hazard.
 func hazard_mult(key: String) -> float:
 	return float(hazard.get(key, 1.0))
@@ -42,6 +85,9 @@ var rewarded: bool = false
 var run_stats: Dictionary = _blank_run_stats()
 
 var in_wave: bool = false
+## How many waves are on the board at once. One normally; more when the
+## next wave has been called in on top of a running one (see `rush_wave`).
+var waves_merged: int = 1
 var wave_time: float = 0.0
 var spawn_queue: Array = []
 var spawn_index: int = 0
@@ -66,6 +112,15 @@ var dragging: bool = false
 var selected: Tower = null
 var hover_cell: Vector2i = Vector2i(-99, -99)
 var hovered_track: int = -1
+## True while the pointer is a finger. Touch reaches the game as emulated
+## mouse events (see `input_devices/pointing` in project.godot), which the
+## engine marks with device -1, so one code path serves mouse and touch and
+## the few places that must differ ask this.
+var touch_input: bool = false
+## How far a dragged tower floats above the finger, so the cell it will land
+## on is not hidden under it. A mouse covers nothing, so it gets no lift.
+const TOUCH_LIFT := Vector2(0.0, -80.0)
+const EMULATED_DEVICE := -1
 
 ## One entry per route: the world-space waypoints enemies walk. Single-route
 ## maps simply have one. `path_points` mirrors the first for convenience.
@@ -113,11 +168,16 @@ var wave_leaks: Dictionary = {}
 var wave_report: String = ""
 var wave_report_timer: float = 0.0
 ## Set when a developer cheat is used; keeps the run out of the record books.
+## Set when a developer toggle in `Cheats` has been used this run. Such a
+## run sets no records and banks nothing.
 var cheats_used: bool = false
-var cheats: Cheats
 var tuning_panel: TuningPanel
 var pause_menu: PauseMenu
 var tutorial: Tutorial
+## The layers the pause menu and the walkthrough sit on. The handheld HUD
+## scales them up with the rest of the text.
+var pause_layer: CanvasLayer
+var tutorial_layer: CanvasLayer
 ## Every widget lives on this; see hud.gd.
 var hud: GameHUD
 
@@ -138,8 +198,17 @@ func _ready() -> void:
 	# Auto-start always begins off: every run is a fresh decision.
 	auto_start = false
 	level_def = TDData.level()
+	challenge = TDData.active_challenge.duplicate(true)
 	gold = int(TDData.level_stat(level_def, "gold") + Progress.bonus_add("start_gold_add"))
 	lives = int(TDData.level_stat(level_def, "lives") + Progress.bonus_add("start_lives_add"))
+	# A challenge's starting purse and lives are exact: the same for every
+	# player, whatever their tech.
+	if rule("gold") != null:
+		gold = int(rule("gold"))
+	elif rule("gold_pct") != null:
+		gold = int(round(TDData.level_stat(level_def, "gold") * float(rule("gold_pct"))))
+	if rule("lives") != null:
+		lives = int(rule("lives"))
 	best_wave = Progress.best_wave(str(level_def["id"]))
 	_build_terrain()
 	_build_world()
@@ -150,41 +219,45 @@ func _ready() -> void:
 	Audio.play_music(true, str(level_def.get("area", "")))
 	# Handicaps chosen on the level card. They are enforced here rather than
 	# checked afterwards, so an honest run is the only kind there is.
-	modifiers = TDData.selected_modifiers.duplicate()
+	# A challenge brings its own rules instead.
+	modifiers = TDData.selected_modifiers.duplicate() if challenge.is_empty() else []
 	# A run's randomness comes from one number, kept with the run, so a
-	# resumed run carries on the same way and a run can be described.
+	# resumed run carries on the same way and a run can be described. The
+	# daily deals everyone the same one.
+	if challenge.has("seed"):
+		run_seed = int(challenge["seed"])
 	if run_seed == 0:
 		run_seed = randi() & 0x7fffffff
 	seed(run_seed)
 	if has_modifier("thin_lives"):
 		lives = maxi(1, lives / 2)
 	if TDData.resume_run:
-		_restore_run(Progress.run_for(str(level_def["id"])))
+		_restore_run(Progress.run_for(run_key()))
 	TDData.resume_run = false
 	preview.announce()
-	var overlay := CanvasLayer.new()
-	overlay.layer = 15
-	add_child(overlay)
+	pause_layer = CanvasLayer.new()
+	pause_layer.layer = 15
+	add_child(pause_layer)
 	pause_menu = PauseMenu.new()
 	pause_menu.game = self
-	overlay.add_child(pause_menu)
+	pause_layer.add_child(pause_menu)
 	# A brand new account is walked through its first run once.
-	if Tutorial.wanted() and not TDData.resume_run:
+	if Tutorial.wanted() and not TDData.resume_run and challenge.is_empty():
+		tutorial_layer = CanvasLayer.new()
+		tutorial_layer.layer = 14
+		add_child(tutorial_layer)
 		tutorial = Tutorial.new()
 		tutorial.game = self
-		overlay.add_child(tutorial)
+		tutorial_layer.add_child(tutorial)
 	if Cheats.available():
 		Cheats.reset_toggles()
-		cheats = Cheats.new()
-		cheats.game = self
-		var cheat_layer := CanvasLayer.new()
-		cheat_layer.layer = 20
-		add_child(cheat_layer)
-		cheat_layer.add_child(cheats)
-		# The balance editor shares the debug gate: F2 opens it.
+		# The balance editor is the one developer panel left: F2 opens it.
+		var dev_layer := CanvasLayer.new()
+		dev_layer.layer = 20
+		add_child(dev_layer)
 		tuning_panel = TuningPanel.new()
 		tuning_panel.game = self
-		cheat_layer.add_child(tuning_panel)
+		dev_layer.add_child(tuning_panel)
 	hud = GameHUD.new()
 	hud.game = self
 	add_child(hud)
@@ -252,6 +325,9 @@ func _build_world() -> void:
 	layer_proj = Node2D.new()
 	layer_air = Node2D.new()
 	layer_air.z_index = 40
+	# Above flying creeps (z 20), which are above the towers: a shot at a
+	# flyer should be seen hitting it, not vanishing under it.
+	layer_proj.z_index = 25
 	for n: Node2D in [layer_fx, layer_enemies, layer_towers, layer_proj, layer_air]:
 		add_child(n)
 
@@ -308,7 +384,9 @@ func can_place(c: Vector2i, type_id: String = "") -> bool:
 		if has_modifier("budget") and occupied.size() >= int(
 				TDData.modifier("budget").get("towers", 12)):
 			return false
-	if type_id != "" and not Progress.tower_unlocked(type_id):
+		if rule("max_towers") != null and occupied.size() >= int(rule("max_towers")):
+			return false
+	if type_id != "" and not tower_available(type_id):
 		return false
 	var kind := terrain_at(c)
 	if type_id == "":
@@ -332,35 +410,60 @@ func can_place_any_rock() -> bool:
 ## map is a Node2D, and this way a release anywhere on screen resolves the
 ## drag exactly once.
 func _input(event: InputEvent) -> void:
+	if event is InputEventMouse:
+		touch_input = event.device == EMULATED_DEVICE
 	if not dragging:
 		return
 	if event is InputEventMouseMotion:
-		hover_cell = world_to_cell(get_global_mouse_position())
+		hover_cell = world_to_cell(drag_point())
 		cursor.queue_redraw()
 		hud.refresh_creep_tip()
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
 			and not event.pressed:
+		# Read the point before the drag ends: the lift applies to it.
+		var pos := drag_point()
 		dragging = false
-		var pos := get_global_mouse_position()
 		if map_rect().has_point(pos) and not game_over:
 			_try_place(world_to_cell(pos))
 		cursor.queue_redraw()
 
 
+## Where a dragged tower is headed: under the mouse, or a little above a
+## finger. Only drags get the lift — a tap lands exactly where it touched.
+func drag_point() -> Vector2:
+	var pos := get_global_mouse_position()
+	if touch_input and dragging:
+		pos += TOUCH_LIFT
+	return pos
+
+
 func begin_drag(type_id: String) -> void:
-	if game_over or not Progress.tower_unlocked(type_id):
+	if game_over or not tower_available(type_id):
 		return
 	placing = type_id
 	dragging = true
 	_select(null)
-	hover_cell = world_to_cell(get_global_mouse_position())
+	hover_cell = world_to_cell(drag_point())
 	hud.refresh_info()
 	cursor.queue_redraw()
 
 
 func map_rect() -> Rect2:
 	return Rect2(0.0, float(TDData.HUD_H), float(TDData.MAP_W), float(TDData.MAP_H))
+
+
+## Puts the board on screen at a scale and position. Everything in the
+## world — map, towers, creeps, cursor, floating text — keeps its own
+## coordinates; only the camera moves, so the mouse comes back in world
+## units too. The desktop layout leaves this at identity.
+func set_world_view(s: float, offset: Vector2) -> void:
+	get_viewport().canvas_transform = Transform2D(0.0, Vector2(s, s), 0.0, offset)
+
+
+## A world point as the HUD sees it.
+func world_to_screen(p: Vector2) -> Vector2:
+	return get_viewport().canvas_transform * p
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -387,8 +490,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			"cancel":
 				_escape()
 			"start_wave":
-				if not game_over and not in_wave:
-					_start_wave_early()
+				if not game_over:
+					rush_wave() if in_wave else _start_wave_early()
 			"pause":
 				_toggle_pause()
 			"speed":
@@ -408,9 +511,6 @@ func _unhandled_input(event: InputEvent) -> void:
 					_restart()
 			"menu":
 				_to_menu()
-			"cheats":
-				if cheats != null:
-					cheats.toggle()
 			"tuning":
 				if tuning_panel != null:
 					tuning_panel.toggle()
@@ -429,7 +529,7 @@ func _click(c: Vector2i) -> void:
 
 func _pick_tower(type_id: String) -> void:
 	dragging = false
-	if not Progress.tower_unlocked(type_id):
+	if not tower_available(type_id):
 		fx_text(Vector2(640.0, 150.0), "%s unlocks at level %d"
 				% [TDData.TOWERS[type_id]["name"], Progress.tower_unlock_level(type_id)],
 				Color("ef5350"), 18)
@@ -443,14 +543,17 @@ func _pick_tower(type_id: String) -> void:
 func _try_place(c: Vector2i) -> void:
 	var d: Dictionary = TDData.tower_def(placing)
 	var cost := tower_cost(placing)
-	if not Progress.tower_unlocked(placing):
-		fx_text(cell_center(c), "Unlocks at level %d" % Progress.tower_unlock_level(placing),
+	if not tower_available(placing):
+		fx_text(cell_center(c), "Not in this challenge" if not challenge.is_empty()
+				else "Unlocks at level %d" % Progress.tower_unlock_level(placing),
 				Color("ef5350"))
 		return
 	if not can_place(c, placing):
 		var why := "Blocked"
 		if in_bounds(c) and not occupied.has(c):
-			if int(d["terrain"]) == TDData.Terrain.WATER:
+			if rule("max_towers") != null and occupied.size() >= int(rule("max_towers")):
+				why = "Tower limit: %d" % int(rule("max_towers"))
+			elif int(d["terrain"]) == TDData.Terrain.WATER:
 				why = "Water only"
 			elif terrain_at(c) == TDData.Terrain.WATER:
 				why = "Needs dry land"
@@ -462,7 +565,11 @@ func _try_place(c: Vector2i) -> void:
 	var t := _place_tower(placing, c)
 	gold -= cost
 	fx_ring(t.position, 40.0, d["color"])
+	# One card, one tower: the ghost stops following the pointer once the
+	# tower is down. Building two means picking the card up twice.
+	placing = ""
 	hud.refresh_info()
+	cursor.queue_redraw()
 
 
 ## Builds a tower on a cell and registers it. Shared by normal placement and
@@ -526,6 +633,10 @@ func _select(t: Tower) -> void:
 func _upgrade_selected(track: int = -1) -> void:
 	if selected == null or not is_instance_valid(selected):
 		return
+	if bool(rule("no_upgrades", false)):
+		fx_text(selected.position + Vector2(0.0, -34.0), "No upgrades in this challenge",
+				Color("ef5350"), 14)
+		return
 	if track < 0:
 		track = selected.cheapest_track()
 	if track < 0:
@@ -571,7 +682,7 @@ func _cycle_target_mode() -> void:
 func _sell_selected() -> void:
 	if selected == null:
 		return
-	if has_modifier("no_sell"):
+	if has_modifier("no_sell") or bool(rule("no_sell", false)):
 		fx_text(selected.position + Vector2(0.0, -34.0), "No refunds this run",
 				Color("ef5350"), 15)
 		return
@@ -736,6 +847,7 @@ func _process_menders(delta: float) -> void:
 func _start_wave() -> void:
 	cancel_move()
 	wave += 1
+	waves_merged = 1
 	wave_leaks = {}
 	wave_report = ""
 	wave_report_timer = 0.0
@@ -745,6 +857,71 @@ func _start_wave() -> void:
 	in_wave = true
 	Audio.play("wave_start", -6.0, 0.0)
 	fx_text(Vector2(640.0, 130.0), "Wave %d" % wave, Color("ffffff"), 30)
+
+
+## Calling the next wave in while this one is still walking. Both run at
+## once: the new creeps are merged into the queue that is already playing,
+## so the board gets a second wave's worth of pressure in exchange for the
+## gold and for reaching the finish line sooner.
+func can_rush() -> bool:
+	if not in_wave or game_over:
+		return false
+	# The finish line is the last wave there is to call in. Winning is only
+	# checked when a wave ends, and a wave that keeps being rushed never
+	# ends — so without this the counter walks straight past the goal and
+	# the run is never won at all.
+	if wave >= goal_wave() and not map_cleared:
+		return false
+	return true
+
+
+## What rushing pays right now. It is the same rate as calling a wave in
+## early between waves — three gold a second of the wait you are giving up
+## — measured here as the spawning still to come, and capped at the same
+## ceiling so that stacking waves can never pay more per wave than a single
+## early call. A wave that has nearly finished spawning is worth little,
+## which is what stops the button being free money late in a wave.
+func rush_bonus() -> int:
+	if not can_rush() or wave + 1 <= early_claimed:
+		return 0
+	var remaining := 0.0
+	if spawn_index < spawn_queue.size():
+		remaining = maxf(0.0, float(spawn_queue[spawn_queue.size() - 1]["t"]) - wave_time)
+	return int(minf(remaining, BREAK_TIME) * 3.0
+			* Progress.bonus_mult("early_bonus_mult"))
+
+
+func rush_wave() -> void:
+	if not can_rush():
+		return
+	var bonus := rush_bonus()
+	cancel_move()
+	wave += 1
+	early_claimed = wave
+	waves_merged += 1
+	# The new wave starts from now, so its own timings are offset by however
+	# long the running one has been going.
+	var entries: Array = _build_wave(wave)
+	for entry: Dictionary in entries:
+		entry["t"] = float(entry["t"]) + wave_time
+	# Only the part of the queue that has not spawned yet is re-sorted;
+	# everything before `spawn_index` has already been let out and must keep
+	# its place, or the spawn loop would walk over it twice.
+	var pending: Array = spawn_queue.slice(spawn_index)
+	pending.append_array(entries)
+	pending.sort_custom(func(a, b): return float(a["t"]) < float(b["t"]))
+	var done: Array = spawn_queue.slice(0, spawn_index)
+	done.append_array(pending)
+	spawn_queue = done
+	if bonus > 0:
+		gold += bonus
+		run_stats["gold_earned"] = int(run_stats.get("gold_earned", 0)) + bonus
+		fx_text(Vector2(640.0, 170.0), "Rush  +$%d" % bonus, Color("ffd54f"), 20)
+	Audio.play("wave_start", -6.0, 0.0)
+	fx_text(Vector2(640.0, 130.0), "Wave %d called in" % wave, Color("ffca28"), 28)
+	preview.announce()
+	hud.refresh_wave_preview()
+	hud.refresh_info()
 
 
 func _start_wave_early() -> void:
@@ -793,7 +970,8 @@ func objective_mask() -> int:
 
 ## Banks whatever the run has earned. Cheated runs earn nothing.
 func _award_stars() -> void:
-	if cheats_used:
+	# A challenge plays a map under other rules; its stars stay the map's.
+	if cheats_used or not challenge.is_empty():
 		return
 	var gained := Progress.record_stars(str(level_def["id"]), objective_mask())
 	if gained == 0:
@@ -817,18 +995,25 @@ func _end_wave() -> void:
 		gold += mined
 		run_stats["gold_earned"] = int(run_stats.get("gold_earned", 0)) + mined
 		fx_text(Vector2(640.0, 170.0), "Mines paid +$%d" % mined, Color("ffca28"), 20)
-	var bonus := 35 + wave * 8
+	# Waves called in on top of each other finish together, and each one
+	# still pays its own clear bonus: rushing trades safety for time, not
+	# for gold it would have earned anyway.
+	var bonus := 0
+	for w in range(wave - waves_merged + 1, wave + 1):
+		bonus += int(round(float(35 + w * 8) * float(rule("gold_mult", 1.0))))
 	gold += bonus
 	score += bonus
 	break_timer = BREAK_TIME
 	# The build phase is when the next wave's roads are worth showing.
 	preview.announce()
 	Audio.play("wave_clear", -6.0, 0.0)
-	fx_text(Vector2(640.0, 130.0), "Wave %d cleared  +$%d" % [wave, bonus], Color("66bb6a"), 24)
+	fx_text(Vector2(640.0, 130.0), ("Waves %d-%d cleared  +$%d"
+			% [wave - waves_merged + 1, wave, bonus]) if waves_merged > 1
+			else ("Wave %d cleared  +$%d" % [wave, bonus]), Color("66bb6a"), 24)
 	run_stats["peak_gold"] = maxi(int(run_stats.get("peak_gold", 0)), gold)
 	_award_stars()
 	_build_wave_report()
-	if not map_cleared and wave >= TDData.clear_wave(level_def):
+	if not map_cleared and wave >= goal_wave():
 		_trigger_victory()
 
 
@@ -844,10 +1029,12 @@ const REPORT_TIME := 8.0
 
 func _build_wave_report() -> void:
 	wave_report_timer = REPORT_TIME
+	var named := "Wave %d" % wave if waves_merged <= 1 \
+			else "Waves %d-%d" % [wave - waves_merged + 1, wave]
 	if wave_leaks.is_empty():
-		wave_report = "Wave %d cleared without losing a life." % wave \
+		wave_report = "%s cleared without losing a life." % named \
 				if bool(run_stats.get("untouched", true)) \
-				else "Wave %d cleared — nothing got through." % wave
+				else "%s cleared — nothing got through." % named
 		return
 	# Name the worst offender and say what actually answers it.
 	var worst := ""
@@ -863,7 +1050,7 @@ func _build_wave_report() -> void:
 		if count > worst_count:
 			worst_count = count
 			worst = kind
-	wave_report = "Wave %d: %d got through (%s)." % [wave, total, ", ".join(parts)]
+	wave_report = "%s: %d got through (%s)." % [named, total, ", ".join(parts)]
 	var tip := str(TDData.ENEMIES[worst].get("note", ""))
 	if tip != "":
 		wave_report += "  %s: %s" % [TDData.ENEMIES[worst]["name"], tip]
@@ -871,9 +1058,9 @@ func _build_wave_report() -> void:
 
 func _build_wave(n: int) -> Array:
 	var hp_mult := pow(1.125, float(n - 1)) * (1.0 + 0.012 * float(max(0, n - 12))) \
-			* TDData.level_stat(level_def, "hp_scale")
+			* TDData.level_stat(level_def, "hp_scale") * float(rule("hp_mult", 1.0))
 	var speed_mult := (1.0 + 0.01 * float(n - 1)) \
-			* TDData.level_stat(level_def, "speed_scale")
+			* TDData.level_stat(level_def, "speed_scale") * float(rule("speed_mult", 1.0))
 	# A wave-wide modifier, if this wave has one: the same creeps, but one
 	# thing about all of them is different.
 	var affix := TDData.affix_for(n)
@@ -903,6 +1090,7 @@ func _build_wave(n: int) -> Array:
 			entries.append({"kind": str(trail["kind"]), "t": t, "hp": hp_mult,
 					"spd": speed_mult})
 			t += float(trail["gap"])
+		_ground_swap(entries)
 		_assign_routes(entries, wave_lanes(n))
 		return entries
 
@@ -925,8 +1113,22 @@ func _build_wave(n: int) -> Array:
 		for entry: Dictionary in entries:
 			entry["armor"] = float(affix["armor_add"])
 			entry["shield"] = int(affix["shield"])
+	_ground_swap(entries)
 	_assign_routes(entries, wave_lanes(n))
 	return entries
+
+
+## A challenge whose towers cannot shoot upwards is played without flyers:
+## each one becomes its counterpart on the ground (Challenges.GROUND_SWAP)
+## rather than being deleted, so the wave is still the same size and still
+## has to be answered — just by a kit that can actually reach it.
+func _ground_swap(entries: Array) -> void:
+	if not Challenges.grounded(challenge):
+		return
+	for entry: Dictionary in entries:
+		var kind := str(entry["kind"])
+		if Challenges.GROUND_SWAP.has(kind):
+			entry["kind"] = str(Challenges.GROUND_SWAP[kind])
 
 
 ## Which lanes wave `n` arrives from. Single-road maps always answer [0]. On
@@ -1019,7 +1221,8 @@ func _on_enemy_split(parent: Enemy, kind: String, count: int) -> void:
 func _on_enemy_died(e: Enemy) -> void:
 	enemies.erase(e)
 	_grid_remove(e)
-	var payout := int(round(float(e.reward) * Progress.bonus_mult("kill_gold_mult")))
+	var payout := int(round(float(e.reward) * Progress.bonus_mult("kill_gold_mult")
+			* float(rule("gold_mult", 1.0))))
 	gold += payout
 	score += payout
 	run_stats["kills"] = int(run_stats.get("kills", 0)) + 1
@@ -1067,11 +1270,11 @@ func _capture_run() -> Dictionary:
 			continue
 		towers.append({"x": cell_key.x, "y": cell_key.y, "type": t.type_id,
 			"mode": t.target_mode, "kills": t.kills, "damage": t.damage_dealt,
-			"invested": t.invested})
+			"invested": t.invested, "ranks": t.ranks.duplicate()})
 	return {
 		# Leaving mid-wave forfeits the rest of it rather than replaying it,
 		# so a wave can never be farmed by parking and resuming.
-		"level": str(level_def["id"]), "wave": wave,
+		"level": str(level_def["id"]), "key": run_key(), "wave": wave,
 		"gold": gold, "lives": lives, "score": score, "leaked": leaked_total,
 		"claimed": maxi(early_claimed, wave if in_wave else early_claimed),
 		"stats": run_stats.duplicate(true), "towers": towers,
@@ -1115,6 +1318,11 @@ func _restore_run(state: Dictionary) -> void:
 		t.kills = int(entry.get("kills", 0))
 		t.damage_dealt = float(entry.get("damage", 0.0))
 		t.invested = int(entry.get("invested", TDData.tower_def(type_id)["cost"]))
+		# Every rank bought this run, by track. Clamped to what each track
+		# allows now, in case the tracks were retuned while it was parked.
+		var saved_ranks: Array = entry.get("ranks", [])
+		for i in mini(saved_ranks.size(), t.ranks.size()):
+			t.ranks[i] = clampi(int(saved_ranks[i]), 0, t.track_max(i))
 		layer_towers.add_child(t)
 		occupied[cell] = t
 		if t.is_support():
@@ -1157,6 +1365,12 @@ func _bank_reward() -> Dictionary:
 	if rewarded:
 		return {}
 	rewarded = true
+	# A cheated run is already kept out of the record books; paying it would
+	# put the account there instead. Filling the board and skipping waves
+	# banked tens of thousands of XP a run, which is a cap reached in an
+	# afternoon and every unlock behind it arriving at once.
+	if cheats_used:
+		return {}
 	var waves := maxi(0, wave - 1)
 	if waves <= 0:
 		return {}
@@ -1200,6 +1414,9 @@ func _surrender() -> void:
 ## offers to carry on into endless, and the run keeps its board either way.
 func _trigger_victory() -> void:
 	map_cleared = true
+	if not challenge.is_empty():
+		_challenge_won()
+		return
 	var first := false
 	if not cheats_used:
 		first = Progress.record_clear(str(level_def["id"]), wave)
@@ -1222,6 +1439,47 @@ func _trigger_victory() -> void:
 			score, lives, leaked_total, payout, objective_summary()])
 
 
+## The challenge's goal is met: its coins (the first time), the run's own
+## payout, and the same panel a cleared map gets, with the way on into
+## endless. The map's records are left alone.
+## A challenge is a fixed objective, not a map: reaching its goal finishes
+## the run then and there. There is no endless afterwards, which is also
+## what stops waves being called in past the goal.
+func _challenge_won() -> void:
+	var result: Dictionary = {}
+	if not cheats_used:
+		result = Progress.complete_challenge(challenge, wave)
+	var reward := _bank_reward()
+	# Nothing follows, so the run stops here rather than being parked or
+	# played on.
+	game_over = true
+	placing = ""
+	_select(null)
+	Progress.clear_run(run_key())
+	var lines: Array = []
+	if bool(result.get("first", false)):
+		lines.append("+%d coins for the challenge" % int(result["coins"]))
+		if challenge.has("daily") and int(result.get("streak", 0)) > 1:
+			lines.append("Daily streak: %d days" % int(result["streak"]))
+	elif challenge.has("daily"):
+		lines.append("Today's daily was already paid out — this one is for the record.")
+	else:
+		lines.append("Beaten before; the challenge pays once.")
+	if not reward.is_empty():
+		var payout := "+%d XP   +%d coins" % [int(reward["xp"]), int(reward["coins"])]
+		if bool(reward["levelled"]):
+			payout += "     LEVEL %d!" % int(reward["level_after"])
+		lines.append(payout)
+	Audio.play("wave_clear", 0.0, 0.0)
+	fx_text(Vector2(640.0, 170.0), "CHALLENGE COMPLETE", Color("ffd54f"), 34)
+	hud.show_victory("%s — wave %d reached on %s.\n%s\nScore %d   Lives left %d   Leaks %d"
+			% [title_name(), wave, level_def["name"], "\n".join(lines), score, lives,
+			leaked_total], "Challenge complete", false)
+	hud.update()
+	Audio.play_music(false)
+	Engine.time_scale = 0.0
+
+
 ## Leaves the victory panel behind and plays on. The map stays cleared.
 func continue_endless() -> void:
 	hud.hide_victory()
@@ -1232,28 +1490,40 @@ func _trigger_game_over() -> void:
 	game_over = true
 	placing = ""
 	_select(null)
-	Progress.clear_run(str(level_def["id"]))
-	var reached := maxi(0, wave - 1)
+	Progress.clear_run(run_key())
+	# Waves called in on top of each other advance the counter before they
+	# are fought, so a record counts what was actually cleared. Without a
+	# rush the two are the same number.
+	var reached: int = int(run_stats.get("cleared", maxi(0, wave - 1)))
 	_award_stars()
 	var reward := _bank_reward()
-	# A cheated run never sets a record.
-	var record := not cheats_used and Progress.record_wave(str(level_def["id"]), reached)
+	# A cheated run never sets a record, and a challenge run sets the
+	# challenge's rather than the map's.
+	var record := false
+	if not cheats_used:
+		if challenge.is_empty():
+			record = Progress.record_wave(str(level_def["id"]), reached)
+		else:
+			Progress.record_challenge_wave(challenge, reached)
 	if record:
 		best_wave = reached
 	var payout := "No reward — the first wave never finished."
+	if cheats_used:
+		payout = "No reward — cheats were used."
 	if not reward.is_empty():
 		payout = "+%d XP   +%d coins" % [int(reward["xp"]), int(reward["coins"])]
 		if bool(reward["levelled"]):
 			payout += "     LEVEL %d!" % int(reward["level_after"])
 	hud.lbl_over.text = "%s (%s) — you held out for %d waves.\nScore %d   Towers %d   Leaks %d\n%s\n%s\n%s" \
-			% [level_def["name"], str(TDData.tier_of(level_def)["name"]), reached, score,
+			% [title_name(), str(TDData.tier_of(level_def)["name"]), reached, score,
 			occupied.size(), leaked_total,
-			"New record!" if record else "Best on this map: wave %d" % best_wave, payout,
-			objective_summary()]
+			("Goal: wave %d" % goal_wave()) if not challenge.is_empty()
+			else ("New record!" if record else "Best on this map: wave %d" % best_wave),
+			payout, objective_summary()]
 	# After a clear, the interesting number is how far past the finish the
 	# endless run went.
 	if map_cleared:
-		var past: int = maxi(0, reached - TDData.clear_wave(level_def))
+		var past: int = maxi(0, reached - goal_wave())
 		hud.lbl_over.text += "\nCleared, then %d waves of endless." % past
 	var breached := leak_summary()
 	if breached != "":
@@ -1271,9 +1541,29 @@ func _trigger_game_over() -> void:
 
 func _restart() -> void:
 	Engine.time_scale = 1.0
-	Progress.clear_run(str(level_def["id"]))
+	Progress.clear_run(run_key())
 	TDData.resume_run = false
 	get_tree().reload_current_scene()
+
+
+## A phone can put the game in the background at any moment and kill it
+## there without notice. Park the run the instant that happens, exactly as
+## the Menu button would, and stop the clock so coming back is not a
+## surprise mid-wave. Desktop never sends this notification.
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_APPLICATION_PAUSED:
+		return
+	if not game_over and wave >= 1:
+		Progress.save_run(_capture_run())
+	if not game_over and not paused:
+		_toggle_pause()
+
+
+## The handheld layout moves the board with the viewport's camera, which
+## outlives the match: put it back, or every menu after a match on a phone
+## is drawn scaled and shifted.
+func _exit_tree() -> void:
+	get_viewport().canvas_transform = Transform2D.IDENTITY
 
 
 ## Leaving mid-run parks it: the map offers Continue next time. A finished or
@@ -1285,7 +1575,8 @@ func _to_menu() -> void:
 	else:
 		_bank_reward()
 	Engine.time_scale = 1.0
-	get_tree().change_scene_to_file(MENU_SCENE)
+	# A challenge run goes back to where it was picked.
+	get_tree().change_scene_to_file(MENU_SCENE if challenge.is_empty() else Challenges.SCENE)
 
 
 # ----------------------------------------------------- combat services / fx
@@ -1538,6 +1829,9 @@ func enemy_at(pos: Vector2) -> Enemy:
 ## The three objectives with a tick against the ones this run has managed
 ## and a star against the ones the account already holds.
 func objective_lines(short: bool = false) -> Array:
+	# A challenge's objectives are its rules.
+	if not challenge.is_empty():
+		return Challenges.rule_lines(challenge)
 	var mask := objective_mask()
 	var held := Progress.stars_for(str(level_def["id"]))
 	var out: Array = []
@@ -1572,12 +1866,17 @@ func leak_summary() -> String:
 
 
 func objective_summary() -> String:
+	if not challenge.is_empty():
+		return "  ·  ".join(Challenges.rule_lines(challenge))
 	var held := Progress.star_count(str(level_def["id"]))
 	return "Stars %d/3 — %s" % [held, "  ".join(objective_lines())]
 
 
 func _on_start_pressed() -> void:
-	if game_over or in_wave:
+	if game_over:
+		return
+	if in_wave:
+		rush_wave()
 		return
 	_start_wave_early()
 
@@ -1606,9 +1905,6 @@ func _toggle_auto() -> void:
 func _escape() -> void:
 	if tuning_panel != null and tuning_panel.visible:
 		tuning_panel.toggle()
-		return
-	if cheats != null and cheats.visible:
-		cheats.toggle()
 		return
 	if paused:
 		_toggle_pause()

@@ -28,6 +28,7 @@ run() {
 }
 
 run verify --quit-after 900 dev/dev_verify.tscn
+run touch  --quit-after 600 dev/dev_touch.tscn
 run air    --quit-after 6000 dev/dev_air.tscn
 run smoke  --fixed-fps 60 --quit-after 20000 dev/dev_smoke.tscn
 

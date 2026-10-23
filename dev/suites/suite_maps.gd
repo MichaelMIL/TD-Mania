@@ -352,7 +352,7 @@ func _check_areas() -> void:
 		deepest = maxi(deepest, need)
 		if Progress.level_unlocked(d):
 			open_now += 1
-		if need < 1 or need > 30:
+		if need < 1 or need > Progress.MAX_LEVEL:
 			ok_gates = false
 	check("a fresh account has exactly one map open", open_now == 1)
 	check("map unlocks are sane and spread out", ok_gates and deepest >= 10)
@@ -500,8 +500,22 @@ func _check_art_prompts() -> void:
 	for unit: String in ["unit_plane", "unit_heli", "shot"]:
 		if not prompts.contains(unit):
 			missing.append(unit)
+	# Every upgrade track's picture, so a new track cannot ship without one.
+	for type_id: String in TDData.TOWERS:
+		for t: Dictionary in TDData.tracks(type_id):
+			var name := UpgradeIcon.art_name(type_id, str(t["key"]))
+			if not prompts.contains(name):
+				missing.append(name)
 	check("every sprite the game looks for has a prompt (%s)"
 			% ", ".join(missing), missing.is_empty())
+	# Every track gets a drawn symbol until its picture arrives.
+	var no_symbol: Array = []
+	for type_id: String in TDData.TOWERS:
+		for t: Dictionary in TDData.tracks(type_id):
+			if UpgradeIcon.glyph_for(type_id, t) == "":
+				no_symbol.append("%s/%s" % [type_id, t["key"]])
+	check("every upgrade track has a symbol to draw (%s)" % ", ".join(no_symbol),
+			no_symbol.is_empty())
 
 	# With no file present the loader must say so rather than half-draw.
 	check("a missing sprite loads as nothing",

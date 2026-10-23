@@ -15,8 +15,22 @@ func _draw() -> void:
 	var r: float = minf(size.x, size.y) * 0.42
 
 	if int(d["terrain"]) == TDData.Terrain.WATER:
-		draw_rect(Rect2(c - Vector2(r, r), Vector2(r, r) * 2.0), Color("22333d"))
-		draw_rect(Rect2(c - Vector2(r, r), Vector2(r, r) * 2.0), col.darkened(0.3), false, 2.0)
+		# Each water tower wears its own footing here too, so the cards are
+		# told apart by shape and not only by a shade of blue.
+		match type_id:
+			"tide":
+				draw_circle(c, r, Color("1b3540"))
+				draw_arc(c, r, 0.0, TAU, 24, col.darkened(0.3), 2.0, true)
+			"torpedo":
+				draw_rect(Rect2(c - Vector2(r, r * 0.62), Vector2(r * 2.0, r * 1.24)),
+						Color("1d2740"))
+				draw_rect(Rect2(c - Vector2(r, r * 0.62), Vector2(r * 2.0, r * 1.24)),
+						col.darkened(0.3), false, 2.0)
+			_:
+				draw_rect(Rect2(c - Vector2(r, r * 0.4), Vector2(r * 2.0, r * 1.3)),
+						Color("13263d"))
+				draw_rect(Rect2(c - Vector2(r, r * 0.4), Vector2(r * 2.0, r * 1.3)),
+						col.darkened(0.3), false, 2.0)
 	elif bool(d.get("air", false)):
 		draw_rect(Rect2(c - Vector2(r, r), Vector2(r, r) * 2.0), Color("2b3446"))
 		draw_rect(Rect2(c - Vector2(r, r), Vector2(r, r) * 2.0), col.darkened(0.4), false, 2.0)
@@ -53,8 +67,18 @@ func _draw() -> void:
 			draw_rect(Rect2(c - Vector2(2.5, r * 0.9), Vector2(5.0, r * 1.5)), col.darkened(0.2))
 			draw_circle(c + Vector2(0.0, -r * 0.1), r * 0.22, col.darkened(0.35))
 		"torpedo":
-			draw_rect(Rect2(c - Vector2(r * 0.6, 6.0), Vector2(r * 1.2, 4.0)), col.darkened(0.2))
-			draw_rect(Rect2(c - Vector2(r * 0.6, 1.0), Vector2(r * 1.2, 4.0)), col.darkened(0.2))
+			for side: float in [-1.0, 1.0]:
+				var y := c.y + side * r * 0.3
+				draw_rect(Rect2(c.x - r * 0.75, y - 2.2, r * 1.3, 4.4), col.darkened(0.15))
+				draw_colored_polygon(PackedVector2Array([
+						Vector2(c.x + r * 0.55, y - 2.2), Vector2(c.x + r * 0.95, y),
+						Vector2(c.x + r * 0.55, y + 2.2)]), col.lightened(0.3))
+		"tide":
+			draw_circle(c, r * 0.26, col.lightened(0.25))
+			draw_circle(c, r * 0.12, Color(1, 1, 1, 0.8))
+			for i in 3:
+				draw_arc(c, r * (0.42 + 0.2 * float(i)), 0.0, TAU, 22,
+						Color(col.r, col.g, col.b, 0.6 - 0.15 * float(i)), 2.0, true)
 		"tarpit":
 			draw_circle(c, r * 0.66, col.darkened(0.4))
 			for i in 3:
@@ -81,12 +105,14 @@ func _draw() -> void:
 			draw_circle(c + Vector2(0.0, -r * 0.75), r * 0.28, col.lightened(0.35))
 			draw_circle(c + Vector2(0.0, -r * 0.75), r * 0.13, Color(1, 1, 1, 0.85))
 		"wavegun":
-			draw_rect(Rect2(c - Vector2(4.0, r * 0.2), Vector2(8.0, r * 0.8)),
-					col.darkened(0.25))
+			draw_colored_polygon(PackedVector2Array([
+					c + Vector2(-r * 0.9, r * 0.5), c + Vector2(-r * 0.55, -r * 0.25),
+					c + Vector2(0.0, -r * 0.5), c + Vector2(r * 0.55, -r * 0.25),
+					c + Vector2(r * 0.9, r * 0.5)]), col.darkened(0.2))
 			for i in 3:
-				draw_arc(c + Vector2(0.0, -r * 0.2), r * (0.35 + 0.22 * float(i)),
-						PI * 1.15, PI * 1.85, 10,
-						Color(col.r, col.g, col.b, 0.6 - 0.15 * float(i)), 2.0, true)
+				draw_arc(c + Vector2(0.0, r * 0.45), r * (0.45 + 0.24 * float(i)),
+						PI * 1.1, PI * 1.9, 12,
+						Color(1, 1, 1, 0.45 - 0.12 * float(i)), 2.0, true)
 		_:
 			# Generic turret: a barrel pointing up out of a hub.
 			var w := 4.5 if type_id == "gun" else 6.5

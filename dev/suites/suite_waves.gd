@@ -14,6 +14,152 @@ func run() -> void:
 	_check_victory()
 	_check_wave_report()
 	_check_wave_preview()
+	_check_rushing()
+
+
+## Calling the next wave in on top of a running one. The two have to merge
+## into one queue without losing or replaying a spawn, pay for the nerve,
+## and still pay every clear bonus at the end.
+func _check_rushing() -> void:
+	game.game_over = false
+	game.in_wave = false
+	game.wave = 4
+	game.early_claimed = 0
+	game.break_timer = game.PREP_TIME
+	check("nothing to rush between waves", not game.can_rush()
+			and game.rush_bonus() == 0)
+
+	game._start_wave()
+	check("a wave that just started is one wave", game.waves_merged == 1)
+	check("and it can be rushed", game.can_rush())
+	var offered: int = game.rush_bonus()
+	check("rushing a fresh wave is worth something", offered > 0)
+
+	# Let part of it out, so there is a spawned head and an unspawned tail.
+	game.wave_time = 2.0
+	while game.spawn_index < game.spawn_queue.size() \
+			and float(game.spawn_queue[game.spawn_index]["t"]) <= game.wave_time:
+		game.spawn_index += 1
+	var let_out: int = game.spawn_index
+	var queued_before: int = game.spawn_queue.size()
+	var head: Array = game.spawn_queue.slice(0, let_out).duplicate(true)
+	var coming: int = game.wave_composition(game.wave + 1).values().reduce(
+			func(a, b): return a + b, 0)
+	var gold_before: int = game.gold
+	var due: int = game.rush_bonus()
+	var wave_before: int = game.wave
+	game.rush_wave()
+
+	check("rushing moves the run on a wave", game.wave == wave_before + 1)
+	check("and says two waves are out at once", game.waves_merged == 2)
+	check("it pays for the nerve", game.gold == gold_before + due and due > 0)
+	check("the next wave's creeps joined the queue",
+			game.spawn_queue.size() == queued_before + coming)
+	check("nothing already let out was disturbed",
+			game.spawn_index == let_out
+			and game.spawn_queue.slice(0, let_out) == head)
+	var ordered := true
+	var last := -1.0
+	for i in range(game.spawn_index, game.spawn_queue.size()):
+		var t := float(game.spawn_queue[i]["t"])
+		if t < last:
+			ordered = false
+		last = t
+	check("and what is still to come is in order", ordered)
+	var not_yet := true
+	for i in range(game.spawn_index, game.spawn_queue.size()):
+		if float(game.spawn_queue[i]["t"]) < game.wave_time:
+			not_yet = false
+	check("nothing was merged in behind the clock", not_yet)
+	check("the same wave cannot be rushed for gold twice",
+			game.rush_bonus() == 0 or game.early_claimed >= game.wave)
+
+	# Every wave in flight still pays its own clear bonus.
+	game.enemies.clear()
+	game.spawn_index = game.spawn_queue.size()
+	var before_clear: int = game.gold
+	var expect := 0
+	for w in range(game.wave - game.waves_merged + 1, game.wave + 1):
+		expect += 35 + w * 8
+	game._end_wave()
+	check("both waves pay their clear bonus (%d)" % expect,
+			game.gold - before_clear >= expect)
+	check("and the run is back between waves", not game.in_wave)
+
+	# The goal is the last wave that can be called in. Winning is checked
+	# when a wave ends, and a rushed wave never ends, so the counter must
+	# not be allowed over the line in the first place.
+	game.game_over = false
+	game.map_cleared = false
+	game.in_wave = false
+	game.wave = game.goal_wave() - 1
+	game.early_claimed = 0
+	game._start_wave()
+	check("the last wave of a run cannot be rushed past",
+			game.wave == game.goal_wave() and not game.can_rush())
+	var stuck: int = game.wave
+	game.rush_wave()
+	check("and asking anyway does nothing", game.wave == stuck
+			and game.rush_bonus() == 0)
+	# One short of the line it is still fair game.
+	game.enemies.clear()
+	game.spawn_index = game.spawn_queue.size()
+	game.in_wave = false
+	game.map_cleared = false
+	game.wave = game.goal_wave() - 2
+	game.early_claimed = 0
+	game._start_wave()
+	check("but the wave before it can be", game.can_rush())
+	game.rush_wave()
+	check("and rushing it reaches the goal exactly", game.wave == game.goal_wave())
+	game.enemies.clear()
+	game.spawn_index = game.spawn_queue.size()
+	game._end_wave()
+	game.map_cleared = false
+	game.game_over = false
+	game.rewarded = false
+	game.hud.over_root.visible = false
+	Engine.time_scale = 1.0
+
+	# Rushing moves the counter before the waves are fought, so a record has
+	# to count what was actually cleared or a rush would inflate it. Well
+	# short of the finish line, so there is room to stack.
+	game.in_wave = false
+	game.wave = 3
+	game.early_claimed = 0
+	game._start_wave()
+	game.run_stats["cleared"] = game.wave - 1
+	var survived: int = int(game.run_stats["cleared"])
+	game.rush_wave()
+	game.rush_wave()
+	check("rushing moves the counter well past what has been cleared",
+			game.wave > survived + 1)
+	# Clear whatever earlier checks recorded, so this measures only what
+	# this defeat writes.
+	Progress.bests[str(game.level_def["id"])] = 0
+	var counter: int = game.wave
+	game.lives = 0
+	game._trigger_game_over()
+	var recorded: int = int(Progress.best_wave(str(game.level_def["id"])))
+	check("but a record counts the waves cleared (%d), not the counter (%d)"
+			% [survived, counter], recorded == survived and recorded < counter)
+	Engine.time_scale = 1.0
+	game.game_over = false
+	game.map_cleared = false
+	game.rewarded = false
+	game.lives = 20
+	game.hud.over_root.visible = false
+
+	# A wave with nothing left to spawn is not worth rushing.
+	game._start_wave()
+	game.wave_time = 9999.0
+	game.spawn_index = game.spawn_queue.size()
+	check("a wave that has finished spawning offers nothing",
+			game.rush_bonus() == 0)
+	game.enemies.clear()
+	game._end_wave()
+	game.in_wave = false
+	game.break_timer = game.PREP_TIME
 
 ## Waves come from a table now. The base curve must be exactly what the old
 ## hardcoded builder produced, and each area's flavour must actually change

@@ -78,16 +78,6 @@ func _build() -> void:
 	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(foot)
 
-	var quit_row := HBoxContainer.new()
-	quit_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	col.add_child(quit_row)
-	var quit := Button.new()
-	quit.text = "Quit"
-	quit.custom_minimum_size = Vector2(100.0, 34.0)
-	quit.focus_mode = Control.FOCUS_NONE
-	quit.pressed.connect(func(): get_tree().quit())
-	quit_row.add_child(quit)
-
 	_refresh()
 
 

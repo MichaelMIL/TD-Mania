@@ -111,7 +111,7 @@ func _build() -> void:
 	give_up.pressed.connect(_end_run)
 	col.add_child(give_up)
 
-	var to_menu := _button("Level select", 14, 36.0)
+	var to_menu := _button("Level select" if game.challenge.is_empty() else "Challenges", 14, 36.0)
 	to_menu.tooltip_text = "Parks this run so you can come back to it"
 	to_menu.pressed.connect(_to_menu)
 	col.add_child(to_menu)

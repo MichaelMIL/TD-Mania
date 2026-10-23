@@ -20,6 +20,7 @@ const SUITES: Array = [
 	"res://dev/suites/suite_maps.gd",
 	"res://dev/suites/suite_waves.gd",
 	"res://dev/suites/suite_account.gd",
+	"res://dev/suites/suite_challenges.gd",
 ]
 
 var game: Node

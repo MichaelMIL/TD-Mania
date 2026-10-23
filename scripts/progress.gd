@@ -34,75 +34,88 @@ static var runs: Dictionary = {}
 static var stars: Dictionary = {}
 ## Maps whose last wave has been beaten: level id -> waves cleared to.
 static var cleared: Dictionary = {}
+## Per challenge id: {"best": deepest wave reached, "done": goal met, "goal":
+## the goal it was met at}. A goal raised since then makes it unbeaten again.
+static var challenges: Dictionary = {}
+## The daily challenge: "last" is the date of the last completed daily,
+## "streak" how many days in a row that has been, "date" and "best" the
+## deepest wave on the most recent day played, "count" all dailies done.
+static var daily: Dictionary = {}
 
 ## Reward weights. A run pays out on waves survived and score, scaled by the
-## map's difficulty tier.
+## map's difficulty tier. Coins buy doctrine and tower ranks in the tech
+## tree; at the old rate a run paid for so much of it that the whole tree
+## was bought within twenty runs, long before the towers it applies to had
+## finished unlocking.
 const XP_PER_WAVE := 40.0
 const XP_PER_SCORE := 0.125
-const COINS_PER_WAVE := 4.0
-const COINS_PER_SCORE := 0.02
+const COINS_PER_WAVE := 2.5
+const COINS_PER_SCORE := 0.013
 static var TIER_REWARD: Array = [1.0, 1.15, 1.3, 1.5]
 
 ## Three branches of four nodes. `requires` names the node directly above it,
 ## so each branch is a chain and the whole thing reads as a tree.
 static var TECH: Array = [
 	{"id": "munitions", "name": "Munitions", "branch": 0, "requires": "",
-		"max": 3, "cost": 40, "cost_mult": 1.7, "mods": {"damage_mult": 1.06},
+		"max": 3, "cost": 80, "cost_mult": 1.7, "mods": {"damage_mult": 1.06},
 		"desc": "Every tower deals more damage."},
 	{"id": "optics", "name": "Optics", "branch": 0, "requires": "munitions",
-		"max": 3, "cost": 55, "cost_mult": 1.7, "mods": {"range_mult": 1.06},
+		"max": 3, "cost": 110, "cost_mult": 1.7, "mods": {"range_mult": 1.06},
 		"desc": "Every tower sees further."},
 	{"id": "drill", "name": "Drill Sergeant", "branch": 0, "requires": "optics",
-		"max": 3, "cost": 70, "cost_mult": 1.7, "mods": {"rate_mult": 1.05},
+		"max": 3, "cost": 140, "cost_mult": 1.7, "mods": {"rate_mult": 1.05},
 		"desc": "Every tower fires faster."},
 	{"id": "blast", "name": "Blast Engineering", "branch": 0, "requires": "drill",
-		"max": 2, "cost": 110, "cost_mult": 1.8, "mods": {"splash_mult": 1.12},
+		"max": 2, "cost": 220, "cost_mult": 1.8, "mods": {"splash_mult": 1.12},
 		"desc": "Splash weapons cover more ground."},
 
 	{"id": "warchest", "name": "War Chest", "branch": 1, "requires": "",
-		"max": 3, "cost": 35, "cost_mult": 1.7, "mods": {"start_gold_add": 30.0},
+		"max": 3, "cost": 70, "cost_mult": 1.7, "mods": {"start_gold_add": 30.0},
 		"desc": "Start every map with more gold."},
 	{"id": "bounty", "name": "Bounty Hunter", "branch": 1, "requires": "warchest",
-		"max": 3, "cost": 55, "cost_mult": 1.7, "mods": {"kill_gold_mult": 1.08},
+		"max": 3, "cost": 110, "cost_mult": 1.7, "mods": {"kill_gold_mult": 1.08},
 		"desc": "Kills pay better."},
 	{"id": "salvage", "name": "Salvage Crew", "branch": 1, "requires": "bounty",
-		"max": 2, "cost": 75, "cost_mult": 1.8, "mods": {"sell_refund_add": 0.08},
+		"max": 2, "cost": 150, "cost_mult": 1.8, "mods": {"sell_refund_add": 0.08},
 		"desc": "Selling a tower refunds more of what you paid."},
 	{"id": "tempo", "name": "Field Tempo", "branch": 1, "requires": "warchest",
-		"max": 2, "cost": 70, "cost_mult": 2.2, "mods": {},
+		"max": 2, "cost": 140, "cost_mult": 2.2, "mods": {},
 		"unlocks": ["Fast forward at 2x", "Fast forward at 3x"],
 		"desc": "Run the match faster. The first rank unlocks 2x, the second 3x."},
 	{"id": "logistics", "name": "Rapid Deployment", "branch": 1, "requires": "salvage",
-		"max": 2, "cost": 120, "cost_mult": 1.8, "mods": {"build_cost_mult": 0.94},
+		"max": 2, "cost": 240, "cost_mult": 1.8, "mods": {"build_cost_mult": 0.94},
 		"desc": "Towers cost less to build."},
 
 	{"id": "fortify", "name": "Fortifications", "branch": 2, "requires": "",
-		"max": 3, "cost": 45, "cost_mult": 1.7, "mods": {"start_lives_add": 2.0},
+		"max": 3, "cost": 90, "cost_mult": 1.7, "mods": {"start_lives_add": 2.0},
 		"desc": "Start every map with more lives."},
 	{"id": "cryo", "name": "Cryogenics", "branch": 2, "requires": "fortify",
-		"max": 2, "cost": 70, "cost_mult": 1.8, "mods": {"slow_add": 0.05},
+		"max": 2, "cost": 140, "cost_mult": 1.8, "mods": {"slow_add": 0.05},
 		"desc": "Every slowing effect bites harder."},
 	{"id": "airdoctrine", "name": "Air Doctrine", "branch": 2, "requires": "cryo",
-		"max": 3, "cost": 85, "cost_mult": 1.7, "mods": {"air_damage_mult": 1.1},
+		"max": 3, "cost": 170, "cost_mult": 1.7, "mods": {"air_damage_mult": 1.1},
 		"desc": "Bombers and gunships hit harder."},
 	{"id": "overtime", "name": "Overtime", "branch": 2, "requires": "airdoctrine",
-		"max": 2, "cost": 95, "cost_mult": 1.8, "mods": {"early_bonus_mult": 1.3},
+		"max": 2, "cost": 190, "cost_mult": 1.8, "mods": {"early_bonus_mult": 1.3},
 		"desc": "Starting a wave early pays a bigger bonus."},
 ]
 
 
+## Where slot files live. A seam rather than a constant so a test can do a
+## real round trip — write a slot, switch, come back — against scratch files
+## instead of the player's own saves.
+static var slot_prefix: String = "user://td_mania_slot_"
+
+
 static func slot_path(index: int) -> String:
-	return "user://td_mania_slot_%d.cfg" % clampi(index, 0, SLOTS - 1)
+	return "%s%d.cfg" % [slot_prefix, clampi(index, 0, SLOTS - 1)]
 
 
 ## Slot chosen on the title screen. Remembered between sessions.
 static func use_slot(index: int) -> void:
 	slot = clampi(index, 0, SLOTS - 1)
 	loaded = false
-	xp = 0
-	coins = 0
-	ranks = {}
-	bests = {}
+	blank_tables()
 	load_state()
 	if not read_only:
 		var g := ConfigFile.new()
@@ -138,8 +151,11 @@ static func migrate_legacy() -> void:
 ##      kill and leak tallies
 ##   3  versioned, and every parked run carries the full stat set
 ##   4  per-map objective stars under [stars]
-##   5  current: which maps have been cleared, under [cleared]
-const SAVE_VERSION := 5
+##   5  which maps have been cleared, under [cleared]
+##   6  a parked run's towers carry their upgrade ranks
+##   7  challenge records under [challenges], the daily under [daily]
+##   8  current: the level curve was stretched; XP is restated on the new one
+const SAVE_VERSION := 8
 
 ## The keys a parked run's stats must have. Kept here rather than imported
 ## from game.gd so migration does not depend on the match scene.
@@ -209,6 +225,15 @@ static func detect_version(cfg: ConfigFile) -> int:
 	return 1 if cfg.has_section("run") else 2
 
 
+## The level curve as it stood before version 8, kept so a save written
+## under it can be read at the level it actually had.
+static func _legacy_xp_for_level(level: int) -> int:
+	if level <= 1:
+		return 0
+	var l := float(level - 1)
+	return int(300.0 * l + 100.0 * l * l)
+
+
 ## Walks a loaded config forward to SAVE_VERSION, one step at a time, so a
 ## save that skipped several builds still arrives in the right shape.
 static func migrate_config(cfg: ConfigFile, from_version: int) -> int:
@@ -224,6 +249,48 @@ static func migrate_config(cfg: ConfigFile, from_version: int) -> int:
 					cfg.set_value("runs", level_id, legacy)
 				if cfg.has_section("run"):
 					cfg.erase_section("run")
+			7:
+				# The level curve was stretched so unlocks arrive over a
+				# campaign rather than a handful of runs. Rebalancing should
+				# not repossess what an account already earned, so the XP is
+				# restated as the same level on the new curve: the player
+				# keeps every tower, map and rank they had, and carries on
+				# from there at the new pace.
+				var old_total := int(cfg.get_value("progress", "xp", 0))
+				var old_level := 1
+				while old_level < MAX_LEVEL \
+						and old_total >= _legacy_xp_for_level(old_level + 1):
+					old_level += 1
+				cfg.set_value("progress", "xp", maxi(old_total, xp_for_level(old_level)))
+			6:
+				# [challenges] and [daily] are new in 7; an older save has
+				# played none yet, so there is nothing to convert.
+				pass
+			5:
+				# Parked runs used to save their towers without upgrade
+				# ranks, so continuing a run brought every tower back plain
+				# while keeping what had been spent on it. Which ranks they
+				# had cannot be recovered; the gold spent on them is handed
+				# back instead, so nothing that was paid for is lost.
+				if cfg.has_section("runs"):
+					for key: String in cfg.get_section_keys("runs"):
+						var run: Dictionary = cfg.get_value("runs", key, {})
+						if run.is_empty():
+							continue
+						var refund := 0
+						for entry: Dictionary in run.get("towers", []):
+							if entry.has("ranks"):
+								continue
+							var type_id := str(entry.get("type", ""))
+							var base := int(TDData.tower_def(type_id).get("cost", 0)) \
+									if TDData.TOWERS.has(type_id) else 0
+							var paid := int(entry.get("invested", base))
+							if paid > base:
+								refund += paid - base
+								entry["invested"] = base
+							entry["ranks"] = []
+						run["gold"] = int(run.get("gold", 0)) + refund
+						cfg.set_value("runs", key, run)
 			4:
 				# [cleared] is new in 5; an older save has cleared nothing
 				# yet, so there is nothing to convert.
@@ -258,20 +325,52 @@ static func migrate_config(cfg: ConfigFile, from_version: int) -> int:
 	return at
 
 
+## Empties every table this account owns and puts the options back to their
+## defaults. One place knows the whole list, because the bug this fixes was
+## three places each clearing a different part of it: switching to a slot
+## with no save file left the previous account's tower ranks, stars, clears,
+## challenges and lifetime stats in memory, and the first save wrote them
+## into the new slot — so the tech tree looked shared between slots.
+static func blank_tables() -> void:
+	xp = 0
+	coins = 0
+	ranks = {}
+	bests = {}
+	runs = {}
+	stats = {}
+	stars = {}
+	cleared = {}
+	challenges = {}
+	daily = {}
+	keys = {}
+	tower_ranks = {}
+	options = {"sfx": 0.8, "music": 0.35, "window_scale": 1.0, "frame_cap": 60,
+		"colourblind": false, "tutorial_done": false}
+
+
 static func load_state() -> void:
 	if loaded:
 		return
 	loaded = true
+	load_slot_file(slot_path(slot))
+
+
+## Reads one slot file into the live account, migrating it if it is old.
+## Split from load_state so it can be pointed at a path in a test rather
+## than at the player's own saves.
+static func load_slot_file(path: String) -> void:
 	slot_too_new = false
-	var cfg := read_config(slot_path(slot))
+	var cfg := read_config(path)
 	if cfg == null:
+		# A slot with nothing in it is a new account, not the last one.
+		blank_tables()
 		return
 	var found := detect_version(cfg)
 	if found > SAVE_VERSION:
 		# Read what we understand, but never write this slot back.
 		slot_too_new = true
-		push_warning("Save slot %d was written by a newer build (v%d > v%d); it will not be overwritten."
-				% [slot + 1, found, SAVE_VERSION])
+		push_warning("Save %s was written by a newer build (v%d > v%d); it will not be overwritten."
+				% [path.get_file(), found, SAVE_VERSION])
 	elif found < SAVE_VERSION:
 		migrate_config(cfg, found)
 	apply_config(cfg)
@@ -282,14 +381,7 @@ static func load_state() -> void:
 static func apply_config(cfg: ConfigFile) -> void:
 	# Every table is cleared first: switching slots must not leave the
 	# previous account's tech, records or lifetime stats behind.
-	ranks = {}
-	bests = {}
-	runs = {}
-	stats = {}
-	stars = {}
-	cleared = {}
-	keys = {}
-	tower_ranks = {}
+	blank_tables()
 	xp = int(cfg.get_value("progress", "xp", 0))
 	coins = int(cfg.get_value("progress", "coins", 0))
 	if cfg.has_section("tech"):
@@ -315,6 +407,14 @@ static func apply_config(cfg: ConfigFile) -> void:
 	if cfg.has_section("cleared"):
 		for key: String in cfg.get_section_keys("cleared"):
 			cleared[key] = int(cfg.get_value("cleared", key, 0))
+	if cfg.has_section("challenges"):
+		for key: String in cfg.get_section_keys("challenges"):
+			var rec: Variant = cfg.get_value("challenges", key, {})
+			if rec is Dictionary:
+				challenges[key] = rec
+	if cfg.has_section("daily"):
+		for key: String in cfg.get_section_keys("daily"):
+			daily[key] = cfg.get_value("daily", key)
 	keys = {}
 	if cfg.has_section("keys"):
 		for key: String in cfg.get_section_keys("keys"):
@@ -346,6 +446,10 @@ static func save_state() -> void:
 		cfg.set_value("stars", key, int(stars[key]))
 	for key: String in cleared:
 		cfg.set_value("cleared", key, int(cleared[key]))
+	for key: String in challenges:
+		cfg.set_value("challenges", key, challenges[key])
+	for key: String in daily:
+		cfg.set_value("daily", key, daily[key])
 	for key: String in keys:
 		cfg.set_value("keys", key, int(keys[key]))
 	cfg.set_value("options", "window_scale", window_scale())
@@ -374,7 +478,6 @@ const DEFAULT_KEYS: Array = [
 	{"id": "restart", "name": "Restart after defeat", "key": KEY_R},
 	{"id": "menu", "name": "Back to level select", "key": KEY_M},
 	{"id": "cancel", "name": "Cancel / deselect", "key": KEY_ESCAPE},
-	{"id": "cheats", "name": "Developer cheats", "key": KEY_F1},
 	{"id": "tuning", "name": "Balance tuning", "key": KEY_F2},
 ]
 
@@ -477,6 +580,13 @@ static func set_window_scale(value: float) -> void:
 ## Resizes the window to the chosen multiple of the design resolution and
 ## re-centres it. Fullscreen is left to the window manager.
 static func apply_window_scale() -> void:
+	# A phone's window is the screen; asking for another size only logs errors.
+	# The handheld layout on a desktop ("-- --phone") keeps its window too.
+	# Read from the command line rather than the App autoload, which a
+	# static class cannot rely on existing.
+	if OS.has_feature("mobile") or Array(OS.get_cmdline_user_args()).any(
+			func(a: String) -> bool: return a.begins_with("--phone")):
+		return
 	if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN:
 		return
 	var base := Vector2i(int(ProjectSettings.get_setting("display/window/size/viewport_width")),
@@ -507,9 +617,11 @@ static func set_volume(kind: String, value: float) -> void:
 # ------------------------------------------------------------ saved run
 
 ## Parks a run under its own map, leaving other maps' saves alone.
+## Parks a run under its key: the map's id, or a challenge's own key (see
+## Challenges.run_key) so the two never overwrite each other.
 static func save_run(state: Dictionary) -> void:
 	load_state()
-	runs[str(state.get("level", ""))] = state
+	runs[str(state.get("key", state.get("level", "")))] = state
 	save_state()
 
 
@@ -797,8 +909,13 @@ static func record_wave(level_id: String, waves: int) -> bool:
 ## Everything the slot picker needs about a save, read without disturbing the
 ## slot currently in play.
 static func slot_summary(index: int) -> Dictionary:
-	var cfg := ConfigFile.new()
-	if cfg.load(slot_path(index)) != OK:
+	# Read it the same way loading it would, backup and all. The picker used
+	# to look at the main file only, so a slot whose save had been removed
+	# but whose backup survived showed as empty and then came back fully
+	# populated the moment it was opened — which looks exactly like one
+	# slot's data turning up in another.
+	var cfg := read_config(slot_path(index))
+	if cfg == null:
 		return {"used": false, "level": 1, "xp": 0, "coins": 0, "maps": 0, "best": 0,
 			"tech": 0}
 	var slot_xp := int(cfg.get_value("progress", "xp", 0))
@@ -822,12 +939,12 @@ static func erase_slot(index: int) -> void:
 	if read_only:
 		return
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(slot_path(index)))
+	# The backup is the whole point of the backup, so it has to go too, or
+	# the next read of this slot restores what was just erased.
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(slot_path(index) + ".bak"))
 	if index == slot:
 		loaded = false
-		xp = 0
-		coins = 0
-		ranks = {}
-		bests = {}
+		blank_tables()
 
 
 ## Blank in-memory account used by the dev harnesses so a developer's own
@@ -846,6 +963,8 @@ static func use_clean_state() -> void:
 	stats = {}
 	stars = {}
 	cleared = {}
+	challenges = {}
+	daily = {}
 	keys = {}
 	runs = {}
 	# Balance overrides are excluded too, so a simulation measures the numbers
@@ -854,29 +973,131 @@ static func use_clean_state() -> void:
 
 
 static func reset() -> void:
-	xp = 0
-	coins = 0
-	ranks = {}
-	bests = {}
-	options = {}
-	tower_ranks = {}
-	stats = {}
-	stars = {}
-	cleared = {}
-	runs = {}
+	blank_tables()
 	if not read_only:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(slot_path(slot)))
 
 
+# -------------------------------------------------------------- challenges
+
+static func challenge_record(id: String) -> Dictionary:
+	load_state()
+	return challenges.get(id, {"best": 0, "done": false})
+
+
+## Beaten at the goal the challenge has now. A record from before its goal
+## was raised (or from before goals were recorded, judged by the deepest
+## wave reached) no longer counts, so the harder version can be won — and
+## paid — again.
+static func challenge_done(id: String) -> bool:
+	var rec := challenge_record(id)
+	if not bool(rec.get("done", false)):
+		return false
+	var c := Challenges.by_id(id)
+	if c.is_empty():
+		return false
+	return int(rec.get("goal", rec.get("best", 0))) >= int(c["waves"])
+
+
+static func challenges_done() -> int:
+	load_state()
+	var n := 0
+	for c: Dictionary in Challenges.LIST:
+		if challenge_done(str(c["id"])):
+			n += 1
+	return n
+
+
+## Remembers how deep a challenge run got, win or lose.
+static func record_challenge_wave(c: Dictionary, waves: int) -> void:
+	load_state()
+	if c.has("daily"):
+		var key := str(c["daily"])
+		if str(daily.get("date", "")) != key:
+			daily["date"] = key
+			daily["best"] = 0
+		daily["best"] = maxi(int(daily.get("best", 0)), waves)
+	else:
+		var id := str(c.get("id", ""))
+		var rec: Dictionary = challenge_record(id).duplicate()
+		rec["best"] = maxi(int(rec.get("best", 0)), waves)
+		challenges[id] = rec
+	save_state()
+
+
+## A challenge's goal was met. Pays its coins the first time (for the
+## daily: the first time that day, plus the streak bonus) and says what it
+## paid: {"first", "coins", "streak"}.
+static func complete_challenge(c: Dictionary, waves: int) -> Dictionary:
+	load_state()
+	record_challenge_wave(c, waves)
+	var out := {"first": false, "coins": 0, "streak": 0}
+	if c.has("daily"):
+		var key := str(c["daily"])
+		if str(daily.get("last", "")) != key:
+			var streak := 1
+			if str(daily.get("last", "")) == Challenges.previous_day(key):
+				streak = int(daily.get("streak", 0)) + 1
+			daily["last"] = key
+			daily["streak"] = streak
+			daily["count"] = int(daily.get("count", 0)) + 1
+			var pay := int(c.get("reward", 0)) + Challenges.streak_bonus(streak)
+			coins += pay
+			out = {"first": true, "coins": pay, "streak": streak}
+		else:
+			out["streak"] = int(daily.get("streak", 0))
+	else:
+		var id := str(c.get("id", ""))
+		var rec: Dictionary = challenge_record(id).duplicate()
+		if not challenge_done(id):
+			rec["done"] = true
+			rec["goal"] = int(c.get("waves", 0))
+			coins += int(c.get("reward", 0))
+			out = {"first": true, "coins": int(c.get("reward", 0)), "streak": 0}
+		challenges[id] = rec
+	save_state()
+	return out
+
+
+static func daily_done(key: String) -> bool:
+	load_state()
+	return str(daily.get("last", "")) == key
+
+
+## The deepest wave reached in the daily for a date.
+static func daily_best(key: String) -> int:
+	load_state()
+	return int(daily.get("best", 0)) if str(daily.get("date", "")) == key else 0
+
+
+## The streak as it stands today: one that missed yesterday is gone.
+static func daily_streak(today_key: String) -> int:
+	load_state()
+	var last := str(daily.get("last", ""))
+	if last == today_key or last == Challenges.previous_day(today_key):
+		return int(daily.get("streak", 0))
+	return 0
+
+
 # ------------------------------------------------------------------- levels
 
+## The shape of the level curve. A run pays somewhere between one and three
+## thousand XP, so the first level lands on the first run and the cap is a
+## couple of hundred runs away. These were measured rather than guessed:
+## dev/dev_progress.tscn plays runs, banks them, and says which run each
+## unlock landed on. With the old 300/100 curve the first run alone paid
+## three towers and two maps, every tower was out by run 15 and the whole
+## tech tree was bought by run 20.
+const XP_LEVEL_LINEAR := 1000.0
+const XP_LEVEL_SQUARE := 150.0
+
 ## Total XP needed to reach `level`. Quadratic, so early levels come quickly
-## and the last tower unlocks take a few good runs.
+## and the last tower unlocks take a long campaign.
 static func xp_for_level(level: int) -> int:
 	if level <= 1:
 		return 0
 	var l := float(level - 1)
-	return int(300.0 * l + 100.0 * l * l)
+	return int(XP_LEVEL_LINEAR * l + XP_LEVEL_SQUARE * l * l)
 
 
 ## Account level for an arbitrary XP total.
